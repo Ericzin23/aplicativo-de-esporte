@@ -1,0 +1,33 @@
+{
+  "expo": {
+    "name": "Gestão de Times",
+    "slug": "gestao-de-times",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "userInterfaceStyle": "light",
+    "splash": {
+      "resizeMode": "contain",
+      "backgroundColor": "#0066FF"
+    },
+    "assetBundlePatterns": [
+      "**/*"
+    ],
+    "ios": {
+      "supportsTablet": true,
+      "bundleIdentifier": "com.gestao.times"
+    },
+    "android": {
+      "adaptiveIcon": {
+        "backgroundColor": "#0066FF"
+      },
+      "package": "com.gestao.times"
+    },
+    "web": {
+      "bundler": "metro"
+    },
+    "plugins": [
+      "expo-router"
+    ],
+    "scheme": "gestao-times"
+  }
+} 
