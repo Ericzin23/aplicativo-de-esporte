@@ -9,6 +9,7 @@ import {
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useAuth } from '../../contexts/AuthContext';
+import { useNotifications } from '../../contexts/NotificationContext';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { getSportConfig, getSportEvents } from '../../utils/sportsConfig';
 
@@ -25,11 +26,13 @@ interface Evento {
 
 export default function AgendaAtleta() {
   const { user } = useAuth();
+  const { clearBadge } = useNotifications();
   const [eventos, setEventos] = useState<Evento[]>([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     loadEventos();
+    clearBadge('events');
   }, []);
 
   async function loadEventos() {
