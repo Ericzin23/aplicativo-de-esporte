@@ -15,6 +15,7 @@ import { useRouter } from 'expo-router';
 import { AddTeamModal } from '../../components/AddTeamModal';
 import { AddPlayerModal } from '../../components/AddPlayerModal';
 import { AddEventModal } from '../../components/AddEventModal';
+import { SPORTS_CONFIG, getSportPositions } from '../../utils/sportsConfig';
 
 export default function Dashboard() {
   const { user } = useAuth();
@@ -35,6 +36,8 @@ export default function Dashboard() {
   const [showPlayerModal, setShowPlayerModal] = useState(false);
   const [showEventModal, setShowEventModal] = useState(false);
   const [selectedSport, setSelectedSport] = useState('Todos');
+  const [selectedTeam, setSelectedTeam] = useState('Todos');
+  const [selectedPosition, setSelectedPosition] = useState('Todos');
 
   // Animações para feedback visual
   const scaleAnims = useRef([
@@ -46,6 +49,15 @@ export default function Dashboard() {
 
   // Esportes disponíveis
   const sports = ['Todos', 'Futebol', 'Vôlei', 'Basquete', 'Futsal', 'Handebol'];
+  const allPositions = React.useMemo(
+    () =>
+      Array.from(
+        new Set(
+          Object.values(SPORTS_CONFIG).flatMap((config) => config.positions)
+        )
+      ),
+    []
+  );
 
   // Função para obter dados filtrados por esporte
   const getFilteredData = () => {
@@ -78,6 +90,27 @@ export default function Dashboard() {
   };
 
   const filteredData = getFilteredData();
+
+  const teamsForFilter = React.useMemo(
+    () =>
+      filteredData.teams.map((t) => ({ id: t.id, name: t.name })),
+    [filteredData.teams]
+  );
+
+  const positionsForFilter = React.useMemo(
+    () =>
+      selectedSport === 'Todos'
+        ? allPositions
+        : getSportPositions(selectedSport.toLowerCase()),
+    [selectedSport, allPositions]
+  );
+
+  const filteredPlayers = filteredData.players.filter((p) => {
+    const matchesTeam = selectedTeam === 'Todos' || p.teamId === selectedTeam;
+    const matchesPosition =
+      selectedPosition === 'Todos' || p.position === selectedPosition;
+    return matchesTeam && matchesPosition;
+  });
 
   // Estatísticas baseadas no esporte selecionado
   const getFilteredStats = () => {
@@ -114,8 +147,8 @@ export default function Dashboard() {
       const team = filteredData.teams.find(t => t.id === player.teamId);
       activities.push({
         id: `player-${player.id}`,
-        title: 'Novo jogador adicionado',
-        subtitle: `${player.name} - ${team?.name || 'Sem time'}`,
+        title: `Adicionou ${player.name}`,
+        subtitle: `ao ${team?.name || 'time indefinido'}`,
         time: getTimeAgo(player.createdAt),
         icon: 'person-add'
       });
@@ -129,8 +162,8 @@ export default function Dashboard() {
     recentTeams.forEach(team => {
       activities.push({
         id: `team-${team.id}`,
-        title: 'Novo time criado',
-        subtitle: `${team.name} - ${selectedSport !== 'Todos' ? selectedSport : team.sport}`,
+        title: `Criou o time ${team.name}`,
+        subtitle: team.sport.charAt(0).toUpperCase() + team.sport.slice(1),
         time: getTimeAgo(team.createdAt),
         icon: 'add-circle'
       });
@@ -141,7 +174,7 @@ export default function Dashboard() {
     upcomingEvents.forEach(event => {
       activities.push({
         id: `event-${event.id}`,
-        title: `${event.type.charAt(0).toUpperCase() + event.type.slice(1)} agendado`,
+        title: `Agendou ${event.type}`,
         subtitle: `${event.title} - ${new Date(event.date).toLocaleDateString('pt-BR')} ${event.time}`,
         time: getTimeAgo(event.createdAt),
         icon: event.type === 'jogo' ? 'football' : event.type === 'treino' ? 'fitness' : 'calendar'
@@ -288,14 +321,17 @@ export default function Dashboard() {
         </View>
 
         {/* Stats Cards com scroll horizontal */}
-        <ScrollView 
-          horizontal 
+        <ScrollView
+          horizontal
           showsHorizontalScrollIndicator={false}
           contentContainerStyle={styles.statsContainer}
           bounces={true}
         >
           {statsData.map((stat, index) => (
-            <View key={index} style={[styles.statCard, { borderLeftColor: stat.color }]}>
+            <View
+              key={index}
+              style={[styles.statCard, { borderLeftColor: stat.color }]}
+            >
               <View style={styles.statContent}>
                 <View>
                   <Text style={styles.statValue}>{stat.value}</Text>
@@ -304,13 +340,102 @@ export default function Dashboard() {
                     <Text style={styles.statSport}>{selectedSport}</Text>
                   )}
                 </View>
-                <View style={[styles.statIcon, { backgroundColor: stat.color + '20' }]}>
+                <View
+                  style={[styles.statIcon, { backgroundColor: stat.color + '20' }]}
+                >
                   <Ionicons name={stat.icon as any} size={24} color={stat.color} />
                 </View>
               </View>
             </View>
           ))}
         </ScrollView>
+
+      {/* Filtro por Time */}
+      <View style={styles.section}>
+        <Text style={styles.sectionTitle}>Filtrar por Time</Text>
+        <ScrollView
+          horizontal
+          showsHorizontalScrollIndicator={false}
+          style={styles.sportFilterContainer}
+          contentContainerStyle={styles.sportFilterContent}
+        >
+          {['Todos', ...teamsForFilter.map(t => t.name)].map(name => (
+            <TouchableOpacity
+              key={name}
+              style={[
+                styles.sportFilterButton,
+                selectedTeam === name && styles.sportFilterButtonActive
+              ]}
+              onPress={() => setSelectedTeam(name === 'Todos' ? 'Todos' : teamsForFilter.find(t => t.name === name)?.id || 'Todos')}
+            >
+              <Text style={[
+                styles.sportFilterText,
+                selectedTeam === name && styles.sportFilterTextActive
+              ]}>{name}</Text>
+            </TouchableOpacity>
+          ))}
+        </ScrollView>
+      </View>
+
+      {/* Filtro por Posição */}
+      <View style={styles.section}>
+        <Text style={styles.sectionTitle}>Filtrar por Posição</Text>
+        <ScrollView
+          horizontal
+          showsHorizontalScrollIndicator={false}
+          style={styles.sportFilterContainer}
+          contentContainerStyle={styles.sportFilterContent}
+        >
+          {['Todos', ...positionsForFilter].map(position => (
+            <TouchableOpacity
+              key={position}
+              style={[
+                styles.sportFilterButton,
+                selectedPosition === position && styles.sportFilterButtonActive
+              ]}
+              onPress={() => setSelectedPosition(position)}
+            >
+              <Text style={[
+                styles.sportFilterText,
+                selectedPosition === position && styles.sportFilterTextActive
+              ]}>{position}</Text>
+            </TouchableOpacity>
+          ))}
+        </ScrollView>
+      </View>
+
+      {/* Jogadores */}
+      <View style={styles.section}>
+        <Text style={styles.sectionTitle}>Alunos</Text>
+        <View style={styles.playersContainer}>
+          {filteredPlayers.length > 0 ? (
+            filteredPlayers.slice(0, 3).map(player => {
+              const team = teams.find(t => t.id === player.teamId);
+              return (
+                <View key={player.id} style={styles.playerItem}>
+                  <Text style={styles.playerName}>{player.name}</Text>
+                  <Text style={styles.playerSub}>{team?.name || 'Sem time'} - {player.position}</Text>
+                </View>
+              );
+            })
+          ) : (
+            <Text style={styles.noPlayersText}>Nenhum jogador encontrado</Text>
+          )}
+        </View>
+      </View>
+
+      {/* Desempenho por Time */}
+      <View style={styles.section}>
+        <Text style={styles.sectionTitle}>Desempenho por Time</Text>
+        <View style={styles.performanceContainer}>
+          {filteredData.teams.map(team => (
+            <View key={team.id} style={styles.performanceItem}>
+              <Text style={styles.perfTeam}>{team.name}</Text>
+              <Text style={styles.perfStats}>{team.wins}V {team.draws}E {team.losses}D</Text>
+            </View>
+          ))}
+        </View>
+      </View>
 
         {/* Quick Actions */}
         <View style={styles.section}>
@@ -734,4 +859,62 @@ const styles = StyleSheet.create({
     fontSize: 12,
     color: '#999',
   },
-}); 
+  playersContainer: {
+    backgroundColor: '#fff',
+    borderRadius: 12,
+    padding: 10,
+    gap: 8,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.1,
+    shadowRadius: 2,
+    elevation: 2,
+  },
+  playerItem: {
+    borderBottomWidth: 1,
+    borderBottomColor: '#f0f0f0',
+    paddingVertical: 6,
+  },
+  playerName: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#333',
+  },
+  playerSub: {
+    fontSize: 12,
+    color: '#666',
+  },
+  noPlayersText: {
+    fontSize: 14,
+    color: '#666',
+    textAlign: 'center',
+    padding: 10,
+  },
+  performanceContainer: {
+    backgroundColor: '#fff',
+    borderRadius: 12,
+    padding: 10,
+    marginBottom: 10,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.1,
+    shadowRadius: 2,
+    elevation: 2,
+  },
+  performanceItem: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    paddingVertical: 6,
+    borderBottomWidth: 1,
+    borderBottomColor: '#f0f0f0',
+  },
+  perfTeam: {
+    fontSize: 14,
+    color: '#333',
+    fontWeight: '600',
+  },
+  perfStats: {
+    fontSize: 12,
+    color: '#666',
+  },
+});
