@@ -15,6 +15,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { useAuth } from '../../contexts/AuthContext';
 import { useRouter } from 'expo-router';
 import { useColorScheme } from '../../hooks/useColorScheme';
+import { createBackupZip } from '../../utils/backup';
 
 export default function Configuracoes() {
   const { user, signOut, updateProfile } = useAuth();
@@ -132,17 +133,21 @@ export default function Configuracoes() {
   const handleBackup = async () => {
     Alert.alert(
       'Backup dos Dados',
-      'Deseja fazer backup de todos os seus dados (times, jogadores, eventos)?',
+      'Deseja gerar e salvar um backup completo no dispositivo?',
       [
         { text: 'Cancelar', style: 'cancel' },
-        { 
-          text: 'Fazer Backup', 
-          onPress: () => {
-            // Simular backup
-            setTimeout(() => {
+        {
+          text: 'Fazer Backup',
+          onPress: async () => {
+            try {
+              if (user) {
+                await createBackupZip({ user });
+              }
               Alert.alert('Sucesso!', 'Backup realizado com sucesso!');
-            }, 1000);
-          }
+            } catch (e) {
+              Alert.alert('Erro', 'Não foi possível gerar o backup.');
+            }
+          },
         },
       ]
     );
