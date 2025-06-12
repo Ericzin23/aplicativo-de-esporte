@@ -15,6 +15,8 @@ import { useRouter, useFocusEffect } from 'expo-router';
 import { useAuth } from '../contexts/AuthContext';
 import { Ionicons } from '@expo/vector-icons';
 import { AntiAutofillInput } from '../components/AntiAutofillInput';
+import { Colors } from '../constants/Colors';
+import { useColorScheme } from '../hooks/useColorScheme';
 
 export default function Login() {
   const [email, setEmail] = useState('');
@@ -24,6 +26,8 @@ export default function Login() {
   
   const { signIn } = useAuth();
   const router = useRouter();
+  const { isDark } = useColorScheme();
+  const styles = createStyles(isDark);
 
   // Hook para limpar autofill quando a tela for focada
   useFocusEffect(
@@ -144,11 +148,12 @@ export default function Login() {
   );
 }
 
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: '#f5f5f5',
-  },
+const createStyles = (isDark: boolean) =>
+  StyleSheet.create({
+    container: {
+      flex: 1,
+      backgroundColor: isDark ? Colors.dark.background : Colors.light.background,
+    },
   scrollContainer: {
     flexGrow: 1,
     justifyContent: 'center',
@@ -161,16 +166,16 @@ const styles = StyleSheet.create({
   title: {
     fontSize: 28,
     fontWeight: 'bold',
-    color: '#333',
+    color: isDark ? Colors.dark.text : Colors.light.text,
     marginTop: 10,
   },
   subtitle: {
     fontSize: 16,
-    color: '#666',
+    color: isDark ? Colors.dark.icon : Colors.light.icon,
     marginTop: 5,
   },
   form: {
-    backgroundColor: '#fff',
+    backgroundColor: isDark ? Colors.dark.background : '#fff',
     borderRadius: 10,
     padding: 20,
     shadowColor: '#000',
@@ -186,11 +191,11 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     borderWidth: 1,
-    borderColor: '#ddd',
+    borderColor: isDark ? '#444' : '#ddd',
     borderRadius: 8,
     marginBottom: 15,
     paddingHorizontal: 15,
-    backgroundColor: '#f9f9f9',
+    backgroundColor: isDark ? '#333' : '#f9f9f9',
     overflow: 'hidden',
     // Força fundo branco mais agressivamente
     shadowColor: 'transparent',
@@ -206,8 +211,8 @@ const styles = StyleSheet.create({
     flex: 1,
     height: 50,
     fontSize: 16,
-    color: '#333',
-    backgroundColor: '#f9f9f9',
+    color: isDark ? Colors.dark.text : '#333',
+    backgroundColor: isDark ? '#333' : '#f9f9f9',
     borderWidth: 0,
     outlineWidth: 0,
   },
@@ -244,7 +249,7 @@ const styles = StyleSheet.create({
     marginTop: 20,
   },
   footerText: {
-    color: '#666',
+    color: isDark ? Colors.dark.icon : '#666',
     fontSize: 16,
   },
   linkText: {
@@ -255,7 +260,7 @@ const styles = StyleSheet.create({
   demoInfo: {
     marginTop: 30,
     padding: 15,
-    backgroundColor: '#e3f2fd',
+    backgroundColor: isDark ? '#2a2d3a' : '#e3f2fd',
     borderRadius: 8,
     borderLeftWidth: 4,
     borderLeftColor: '#0066FF',
@@ -268,6 +273,6 @@ const styles = StyleSheet.create({
   },
   demoText: {
     fontSize: 12,
-    color: '#666',
+    color: isDark ? Colors.dark.icon : '#666',
   },
-}); 
+});
