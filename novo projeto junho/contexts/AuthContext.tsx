@@ -76,7 +76,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
         throw new Error('Email ou senha incorretos');
       }
     } catch (error) {
-      throw error;
+      console.error('Erro no login:', error);
     } finally {
       setIsLoading(false);
     }
@@ -113,7 +113,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
       await AsyncStorage.setItem('@GestaoTimes:user', JSON.stringify(userData));
       setUser(userData);
     } catch (error) {
-      throw error;
+      console.error('Erro no cadastro:', error);
     } finally {
       setIsLoading(false);
     }
@@ -149,7 +149,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
         setUser(updatedUser);
       }
     } catch (error) {
-      throw error;
+      console.error('Erro ao atualizar perfil:', error);
     }
   }
 
