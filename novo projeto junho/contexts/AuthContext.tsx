@@ -9,13 +9,14 @@ interface User {
   userType: 'professor' | 'atleta';
   professorId?: string; // Para atletas, referência ao professor
   sport?: string; // Para atletas, esporte que pratica
+  position?: string;
 }
 
 interface AuthContextData {
   user: User | null;
   isLoading: boolean;
   signIn: (email: string, password: string) => Promise<void>;
-  signUp: (name: string, email: string, password: string, userType: 'professor' | 'atleta', professorId?: string, sport?: string) => Promise<void>;
+  signUp: (name: string, email: string, password: string, userType: 'professor' | 'atleta', professorId?: string, sport?: string, position?: string) => Promise<void>;
   signOut: () => Promise<void>;
   updateProfile: (userData: Partial<User>) => Promise<void>;
 }
@@ -82,40 +83,43 @@ export function AuthProvider({ children }: AuthProviderProps) {
     }
   }
 
-  async function signUp(name: string, email: string, password: string, userType: 'professor' | 'atleta', professorId?: string, sport?: string) {
+  async function signUp(
+    name: string,
+    email: string,
+    password: string,
+    userType: 'professor' | 'atleta',
+    professorId?: string,
+    sport?: string,
+    position?: string
+  ) {
     try {
-      setIsLoading(true);
-      
-      // Verificar se email já existe
-      const storedUsers = await AsyncStorage.getItem('@GestaoTimes:users');
-      const users = storedUsers ? JSON.parse(storedUsers) : [];
-      
-      const existingUser = users.find((u: User) => u.email === email);
-      if (existingUser) {
-        throw new Error('Este email já está cadastrado');
+      const users = await AsyncStorage.getItem('@GestaoTimes:users');
+      const parsedUsers = users ? JSON.parse(users) : [];
+
+      const userExists = parsedUsers.find((user: User) => user.email === email);
+
+      if (userExists) {
+        throw new Error('Usuário já existe');
       }
-      
-      const userData: User = {
+
+      const newUser: User = {
         id: Date.now().toString(),
-        name: name,
-        email: email,
-        avatar: 'https://via.placeholder.com/150',
-        userType: userType,
+        name,
+        email,
+        userType,
         ...(userType === 'atleta' && professorId && { professorId }),
-        ...(userType === 'atleta' && sport && { sport })
+        ...(userType === 'atleta' && sport && { sport }),
+        ...(userType === 'atleta' && position && { position }),
       };
-      
-      // Salvar na lista de usuários
-      users.push(userData);
-      await AsyncStorage.setItem('@GestaoTimes:users', JSON.stringify(users));
-      
-      // Salvar como usuário atual
-      await AsyncStorage.setItem('@GestaoTimes:user', JSON.stringify(userData));
-      setUser(userData);
+
+      await AsyncStorage.setItem(
+        '@GestaoTimes:users',
+        JSON.stringify([...parsedUsers, newUser])
+      );
+
+      setUser(newUser);
     } catch (error) {
       throw error;
-    } finally {
-      setIsLoading(false);
     }
   }
 

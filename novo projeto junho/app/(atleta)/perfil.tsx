@@ -11,6 +11,7 @@ import {
   TextInput,
   Modal,
   Image,
+  ActivityIndicator,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useAuth } from '../../contexts/AuthContext';
@@ -18,6 +19,7 @@ import { useRouter } from 'expo-router';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { getSportConfig, getSportStatistics, getSportPositions } from '../../utils/sportsConfig';
 import * as ImagePicker from 'expo-image-picker';
+import DropDownPicker from 'react-native-dropdown-picker';
 
 // Adicionar interface para tipagem
 interface PlayerInfo {
@@ -43,8 +45,8 @@ export default function PerfilAtleta() {
     esporte: user?.sport || 'Não definido'
   });
   const [isEditing, setIsEditing] = useState(false);
-  const [editedName, setEditedName] = useState('');
-  const [editedEmail, setEditedEmail] = useState('');
+  const [editedName, setEditedName] = useState(user?.name || '');
+  const [editedEmail, setEditedEmail] = useState(user?.email || '');
   const [editedPhone, setEditedPhone] = useState('');
   const [editedBirthDate, setEditedBirthDate] = useState('');
   const [editedHeight, setEditedHeight] = useState('');
@@ -56,11 +58,21 @@ export default function PerfilAtleta() {
   const [passwordError, setPasswordError] = useState('');
   const [profileImage, setProfileImage] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
+  const [openPosicao, setOpenPosicao] = useState(false);
+  const [posicaoSelecionada, setPosicaoSelecionada] = useState<string | null>(null);
+  const [posicoesDisponiveis, setPosicoesDisponiveis] = useState<Array<{label: string, value: string}>>([]);
 
   useEffect(() => {
     loadPlayerData();
     loadSettings();
     requestImagePermission();
+    if (user?.sport) {
+      const posicoes = getSportPositions(user.sport).map(pos => ({
+        label: pos.charAt(0).toUpperCase() + pos.slice(1),
+        value: pos
+      }));
+      setPosicoesDisponiveis(posicoes);
+    }
   }, []);
 
   async function requestImagePermission() {
@@ -72,21 +84,81 @@ export default function PerfilAtleta() {
 
   async function pickImage() {
     try {
-      const result = await ImagePicker.launchImageLibraryAsync({
+      Alert.alert(
+        'Alterar Foto de Perfil',
+        'Como você deseja alterar sua foto?',
+        [
+          {
+            text: 'Tirar Foto',
+            onPress: async () => {
+              const { status } = await ImagePicker.requestCameraPermissionsAsync();
+              if (status !== 'granted') {
+                Alert.alert(
+                  'Permissão Necessária',
+                  'Precisamos de permissão para acessar sua câmera.',
+                  [{ text: 'OK' }]
+                );
+                return;
+              }
+              await handleImageSelection(ImagePicker.launchCameraAsync);
+            }
+          },
+          {
+            text: 'Escolher da Galeria',
+            onPress: async () => {
+              const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
+              if (status !== 'granted') {
+                Alert.alert(
+                  'Permissão Necessária',
+                  'Precisamos de permissão para acessar sua galeria de fotos.',
+                  [{ text: 'OK' }]
+                );
+                return;
+              }
+              await handleImageSelection(ImagePicker.launchImageLibraryAsync);
+            }
+          },
+          {
+            text: 'Cancelar',
+            style: 'cancel'
+          }
+        ]
+      );
+    } catch (error) {
+      console.log('Erro ao iniciar seleção de imagem:', error);
+      Alert.alert('Erro', 'Não foi possível iniciar a seleção de imagem. Tente novamente.');
+    }
+  }
+
+  async function handleImageSelection(imagePickerFunction: any) {
+    try {
+      setIsLoading(true);
+      const result = await imagePickerFunction({
         mediaTypes: ImagePicker.MediaTypeOptions.Images,
         allowsEditing: true,
         aspect: [1, 1],
-        quality: 0.5,
+        quality: 0.7,
       });
 
       if (!result.canceled) {
-        setProfileImage(result.assets[0].uri);
         // Salvar a imagem no AsyncStorage
         await AsyncStorage.setItem(`@GestaoTimes:profile_image_${user?.id}`, result.assets[0].uri);
+        setProfileImage(result.assets[0].uri);
+        
+        // Atualizar o perfil do usuário com a nova imagem
+        const updatedUser = {
+          ...user,
+          avatar: result.assets[0].uri
+        };
+        await updateProfile(updatedUser);
+        
+        Alert.alert('Sucesso', 'Foto de perfil atualizada com sucesso!');
       }
     } catch (error) {
-      console.log('Erro ao selecionar imagem:', error);
-      Alert.alert('Erro', 'Não foi possível selecionar a imagem. Tente novamente.');
+      console.log('Erro ao processar imagem:', error);
+      Alert.alert('Erro', 'Não foi possível atualizar a foto de perfil. Tente novamente.');
+    } finally {
+      setIsLoading(false);
     }
   }
 
@@ -459,35 +531,82 @@ export default function PerfilAtleta() {
     }
   }
 
+  const handleSalvarPosicao = async () => {
+    try {
+      if (!posicaoSelecionada) {
+        Alert.alert('Erro', 'Por favor, selecione uma posição.');
+        return;
+      }
+
+      const storedPlayers = await AsyncStorage.getItem('@GestaoTimes:players');
+      const players = storedPlayers ? JSON.parse(storedPlayers) : [];
+      
+      const playerIndex = players.findIndex((p: any) => 
+        p.name === user?.name || p.email === user?.email
+      );
+      
+      if (playerIndex !== -1) {
+        players[playerIndex] = {
+          ...players[playerIndex],
+          position: posicaoSelecionada
+        };
+        
+        await AsyncStorage.setItem('@GestaoTimes:players', JSON.stringify(players));
+        
+        setPlayerInfo(prev => ({
+          ...prev,
+          posicao: posicaoSelecionada
+        }));
+        
+        Alert.alert('Sucesso', 'Posição atualizada com sucesso!');
+      }
+    } catch (error) {
+      console.log('Erro ao salvar posição:', error);
+      Alert.alert('Erro', 'Não foi possível atualizar a posição.');
+    }
+  };
+
   return (
     <SafeAreaView style={styles.container}>
       <ScrollView showsVerticalScrollIndicator={false}>
         {/* Header do Perfil */}
         <View style={styles.profileHeader}>
-          <TouchableOpacity 
-            style={styles.profileImageContainer}
-            onPress={pickImage}
-          >
-            {profileImage ? (
-              <Image 
-                source={{ uri: profileImage }} 
-                style={styles.profileImage}
-              />
-            ) : (
-              <View style={styles.profileImagePlaceholder}>
-                <Ionicons name="person" size={40} color="#666" />
-              </View>
-            )}
-            <View style={styles.editImageButton}>
-              <Ionicons name="camera" size={20} color="#fff" />
+          <View style={styles.profileSection}>
+            <View style={styles.avatarContainer}>
+              {isLoading ? (
+                <View style={[styles.profileImage, styles.loadingContainer]}>
+                  <ActivityIndicator size="large" color="#4CAF50" />
+                </View>
+              ) : (
+                <Image 
+                  source={{ uri: profileImage || 'https://via.placeholder.com/120' }}
+                  style={styles.profileImage}
+                  onError={() => {
+                    console.log('Erro ao carregar imagem');
+                    setProfileImage(null);
+                  }}
+                />
+              )}
+              <TouchableOpacity 
+                style={[styles.cameraButton, isLoading && styles.cameraButtonDisabled]}
+                onPress={pickImage}
+                disabled={isLoading}
+              >
+                <Ionicons name="camera" size={20} color="#fff" />
+              </TouchableOpacity>
             </View>
-          </TouchableOpacity>
-          <View style={styles.profileInfo}>
-            <Text style={styles.userName}>{user?.name || 'Atleta'}</Text>
-            <Text style={styles.userEmail}>{user?.email || 'email@exemplo.com'}</Text>
-            <View style={styles.userTypeBadge}>
-              <Ionicons name="fitness" size={16} color="#4CAF50" />
-              <Text style={styles.userTypeText}>Atleta</Text>
+            <View style={styles.profileInfo}>
+              <Text style={styles.profileName}>{user?.name}</Text>
+              <Text style={styles.profileEmail}>{user?.email}</Text>
+              <TouchableOpacity 
+                style={styles.changePhotoButton}
+                onPress={pickImage}
+                disabled={isLoading}
+              >
+                <Text style={styles.changePhotoText}>
+                  {isLoading ? 'Atualizando...' : 'Alterar Foto'}
+                </Text>
+              </TouchableOpacity>
             </View>
           </View>
         </View>
@@ -499,9 +618,15 @@ export default function PerfilAtleta() {
             <View style={styles.infoRow}>
               <Ionicons name="location" size={20} color="#666" />
               <Text style={styles.infoLabel}>Posição:</Text>
-              <Text style={[styles.infoValue, playerInfo.posicao === 'Aguardando definição do professor' ? styles.pendingValue : null]}>
-                {formatPosition(playerInfo.posicao)}
-              </Text>
+              <TouchableOpacity 
+                style={styles.posicaoButton}
+                onPress={() => setOpenPosicao(true)}
+              >
+                <Text style={[styles.infoValue, playerInfo.posicao === 'Aguardando definição do professor' ? styles.pendingValue : null]}>
+                  {formatPosition(playerInfo.posicao)}
+                </Text>
+                <Ionicons name="chevron-down" size={20} color="#666" />
+              </TouchableOpacity>
             </View>
             <View style={styles.infoRow}>
               <Ionicons name="people" size={20} color="#666" />
@@ -621,24 +746,29 @@ export default function PerfilAtleta() {
             <View style={styles.modalContent}>
               <Text style={styles.modalTitle}>Editar Perfil</Text>
               
-              <TouchableOpacity 
-                style={styles.profileImageContainer}
-                onPress={pickImage}
-              >
-                {profileImage ? (
-                  <Image 
-                    source={{ uri: profileImage }} 
-                    style={styles.profileImage}
-                  />
-                ) : (
-                  <View style={styles.profileImagePlaceholder}>
-                    <Ionicons name="person" size={40} color="#666" />
-                  </View>
-                )}
-                <View style={styles.editImageButton}>
-                  <Ionicons name="camera" size={20} color="#fff" />
+              <View style={styles.profileSection}>
+                <View style={styles.avatarContainer}>
+                  {isLoading ? (
+                    <View style={[styles.profileImage, styles.loadingContainer]}>
+                      <ActivityIndicator size="large" color="#4CAF50" />
+                    </View>
+                  ) : (
+                    <Image 
+                      source={{ uri: profileImage || 'https://via.placeholder.com/120' }}
+                      style={styles.profileImage}
+                    />
+                  )}
+                  <TouchableOpacity 
+                    style={[styles.cameraButton, isLoading && styles.cameraButtonDisabled]}
+                    onPress={pickImage}
+                    disabled={isLoading}
+                  >
+                    <Ionicons name="camera" size={20} color="#fff" />
+                  </TouchableOpacity>
                 </View>
-              </TouchableOpacity>
+                <Text style={styles.profileName}>{user?.name}</Text>
+                <Text style={styles.profileEmail}>{user?.email}</Text>
+              </View>
               
               <View style={styles.inputGroup}>
                 <Text style={styles.inputLabel}>Nome</Text>
@@ -814,6 +944,46 @@ export default function PerfilAtleta() {
           </View>
         </Modal>
 
+        {/* Modal de Seleção de Posição */}
+        <Modal
+          visible={openPosicao}
+          transparent={true}
+          animationType="slide"
+          onRequestClose={() => setOpenPosicao(false)}
+        >
+          <View style={styles.modalOverlay}>
+            <View style={styles.modalContent}>
+              <View style={styles.modalHeader}>
+                <Text style={styles.modalTitle}>Selecione sua Posição</Text>
+                <TouchableOpacity onPress={() => setOpenPosicao(false)}>
+                  <Ionicons name="close" size={24} color="#666" />
+                </TouchableOpacity>
+              </View>
+
+              <DropDownPicker
+                items={posicoesDisponiveis}
+                placeholder="Selecione sua posição"
+                open={openPosicao}
+                setOpen={setOpenPosicao}
+                value={posicaoSelecionada}
+                setValue={setPosicaoSelecionada}
+                style={styles.dropdown}
+                dropDownContainerStyle={styles.dropdownContainer}
+                zIndex={3000}
+                zIndexInverse={1000}
+                listMode="MODAL"
+              />
+
+              <TouchableOpacity 
+                style={styles.saveButton}
+                onPress={handleSalvarPosicao}
+              >
+                <Text style={styles.saveButtonText}>Salvar Posição</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </Modal>
+
         {/* Botão de Logout */}
         <View style={styles.logoutContainer}>
           <TouchableOpacity style={styles.logoutButton} onPress={handleLogout}>
@@ -844,43 +1014,57 @@ const styles = StyleSheet.create({
     padding: 20,
     marginBottom: 15,
   },
+  profileSection: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
   avatarContainer: {
-    width: 80,
-    height: 80,
-    borderRadius: 40,
-    backgroundColor: '#e8f5e8',
+    width: 120,
+    height: 120,
+    borderRadius: 60,
+    marginRight: 16,
+    position: 'relative',
+  },
+  profileImage: {
+    width: '100%',
+    height: '100%',
+    borderRadius: 60,
+  },
+  loadingContainer: {
     justifyContent: 'center',
     alignItems: 'center',
-    marginRight: 16,
+    backgroundColor: '#f0f0f0',
+  },
+  cameraButton: {
+    position: 'absolute',
+    bottom: 0,
+    right: 0,
+    backgroundColor: '#007AFF',
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    justifyContent: 'center',
+    alignItems: 'center',
+    borderWidth: 2,
+    borderColor: '#fff',
+  },
+  cameraButtonDisabled: {
+    opacity: 0.5,
   },
   profileInfo: {
     flex: 1,
+    marginLeft: 16,
   },
-  userName: {
+  profileName: {
     fontSize: 24,
     fontWeight: 'bold',
     color: '#333',
     marginBottom: 4,
   },
-  userEmail: {
+  profileEmail: {
     fontSize: 14,
     color: '#666',
     marginBottom: 8,
-  },
-  userTypeBadge: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: '#e8f5e8',
-    paddingHorizontal: 12,
-    paddingVertical: 4,
-    borderRadius: 16,
-    alignSelf: 'flex-start',
-  },
-  userTypeText: {
-    fontSize: 12,
-    color: '#4CAF50',
-    fontWeight: '600',
-    marginLeft: 4,
   },
   quickStatsSection: {
     backgroundColor: '#fff',
@@ -1140,39 +1324,6 @@ const styles = StyleSheet.create({
     marginBottom: 20,
     textAlign: 'center',
   },
-  profileImageContainer: {
-    width: 120,
-    height: 120,
-    borderRadius: 60,
-    marginBottom: 16,
-    position: 'relative',
-  },
-  profileImage: {
-    width: '100%',
-    height: '100%',
-    borderRadius: 60,
-  },
-  profileImagePlaceholder: {
-    width: '100%',
-    height: '100%',
-    borderRadius: 60,
-    backgroundColor: '#f0f0f0',
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  editImageButton: {
-    position: 'absolute',
-    bottom: 0,
-    right: 0,
-    backgroundColor: '#007AFF',
-    width: 36,
-    height: 36,
-    borderRadius: 18,
-    justifyContent: 'center',
-    alignItems: 'center',
-    borderWidth: 2,
-    borderColor: '#fff',
-  },
   disabledInput: {
     backgroundColor: '#f5f5f5',
     color: '#666',
@@ -1182,5 +1333,59 @@ const styles = StyleSheet.create({
     color: '#666',
     marginTop: 4,
     fontStyle: 'italic',
+  },
+  changePhotoButton: {
+    marginTop: 8,
+    paddingVertical: 6,
+    paddingHorizontal: 12,
+    backgroundColor: '#f0f0f0',
+    borderRadius: 16,
+    alignSelf: 'flex-start',
+  },
+  changePhotoText: {
+    color: '#666',
+    fontSize: 12,
+    fontWeight: '600',
+  },
+  posicaoButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    flex: 1,
+  },
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  dropdown: {
+    borderColor: '#0066FF',
+    backgroundColor: '#f9f9f9',
+    marginBottom: 20,
+  },
+  dropdownContainer: {
+    borderColor: '#0066FF',
+    backgroundColor: '#f9f9f9',
+  },
+  saveButton: {
+    backgroundColor: '#0066FF',
+    padding: 15,
+    borderRadius: 8,
+    alignItems: 'center',
+  },
+  saveButtonText: {
+    color: '#fff',
+    fontSize: 16,
+    fontWeight: 'bold',
+  },
+  modalHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    padding: 10,
+  },
+  modalTitle: {
+    fontSize: 20,
+    fontWeight: 'bold',
   },
 }); 
