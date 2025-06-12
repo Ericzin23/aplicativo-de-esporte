@@ -5,6 +5,7 @@ interface User {
   id: string;
   name: string;
   email: string;
+  password: string;
   avatar?: string;
   userType: 'professor' | 'atleta';
   professorId?: string; // Para atletas, referência ao professor
@@ -19,6 +20,7 @@ interface AuthContextData {
   signUp: (name: string, email: string, password: string, userType: 'professor' | 'atleta', professorId?: string, sport?: string, position?: string) => Promise<void>;
   signOut: () => Promise<void>;
   updateProfile: (userData: Partial<User>) => Promise<void>;
+  updatePassword: (current: string, newPassword: string) => Promise<void>;
 }
 
 const AuthContext = createContext<AuthContextData>({} as AuthContextData);
@@ -51,14 +53,14 @@ export function AuthProvider({ children }: AuthProviderProps) {
   async function signIn(email: string, password: string) {
     try {
       setIsLoading(true);
-      
+
       // Verificar se é um usuário cadastrado
       const storedUsers = await AsyncStorage.getItem('@GestaoTimes:users');
       const users = storedUsers ? JSON.parse(storedUsers) : [];
-      
+
       const foundUser = users.find((u: User) => u.email === email);
-      
-      if (foundUser && password === '123456') { // Senha padrão para demo
+
+      if (foundUser && foundUser.password === password) {
         await AsyncStorage.setItem('@GestaoTimes:user', JSON.stringify(foundUser));
         setUser(foundUser);
       } else if (email === 'admin@teste.com' && password === '123456') {
@@ -67,6 +69,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
           id: '1',
           name: 'Eric',
           email: email,
+          password: '123456',
           avatar: 'https://via.placeholder.com/150',
           userType: 'professor'
         };
@@ -106,6 +109,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
         id: Date.now().toString(),
         name,
         email,
+        password,
         userType,
         ...(userType === 'atleta' && professorId && { professorId }),
         ...(userType === 'atleta' && sport && { sport }),
@@ -157,6 +161,25 @@ export function AuthProvider({ children }: AuthProviderProps) {
     }
   }
 
+  async function updatePassword(current: string, newPassword: string) {
+    if (!user) return;
+
+    const storedUsers = await AsyncStorage.getItem('@GestaoTimes:users');
+    const users = storedUsers ? JSON.parse(storedUsers) : [];
+    const userIndex = users.findIndex((u: User) => u.id === user.id);
+
+    if (userIndex === -1 || users[userIndex].password !== current) {
+      throw new Error('Senha atual incorreta');
+    }
+
+    users[userIndex].password = newPassword;
+    await AsyncStorage.setItem('@GestaoTimes:users', JSON.stringify(users));
+
+    const updated = { ...user, password: newPassword };
+    await AsyncStorage.setItem('@GestaoTimes:user', JSON.stringify(updated));
+    setUser(updated);
+  }
+
   return (
     <AuthContext.Provider
       value={{
@@ -166,6 +189,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
         signUp,
         signOut,
         updateProfile,
+        updatePassword,
       }}
     >
       {children}
