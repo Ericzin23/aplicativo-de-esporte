@@ -9,6 +9,7 @@ import {
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useAuth } from '../../contexts/AuthContext';
+import { useNotifications } from '../../contexts/NotificationContext';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
 import OrientacaoItem, { Orientacao } from '../../components/OrientacaoItem';
@@ -16,11 +17,13 @@ import OrientacaoItem, { Orientacao } from '../../components/OrientacaoItem';
 
 export default function OrientacoesAtleta() {
   const { user } = useAuth();
+  const { clearBadge } = useNotifications();
   const [orientacoes, setOrientacoes] = useState<Orientacao[]>([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     loadOrientacoes();
+    clearBadge('guidance');
   }, []);
 
   async function loadOrientacoes() {

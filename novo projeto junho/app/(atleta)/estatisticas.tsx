@@ -13,6 +13,7 @@ import ViewShot, { captureRef } from 'react-native-view-shot';
 import * as Sharing from 'expo-sharing';
 import { BarChart, PieChart } from 'react-native-chart-kit';
 import { useAuth } from '../../contexts/AuthContext';
+import { useNotifications } from '../../contexts/NotificationContext';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { getSportConfig, getSportStatistics, getSportPositions } from '../../utils/sportsConfig';
 
@@ -33,6 +34,7 @@ interface EstatisticasDetalhadas {
 
 export default function EstatisticasAtleta() {
   const { user } = useAuth();
+  const { clearBadge } = useNotifications();
   const [stats, setStats] = useState<EstatisticasDetalhadas>({
     minutosJogados: 0,
     aproveitamento: 0,
@@ -48,6 +50,7 @@ export default function EstatisticasAtleta() {
 
   useEffect(() => {
     loadEstatisticas();
+    clearBadge('stats');
   }, []);
 
   const periodTotals = calcularEstatisticasPeriodo(periodoSelecionado);
