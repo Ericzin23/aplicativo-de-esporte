@@ -1,5 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { View, Text, ActivityIndicator, StyleSheet, Platform } from 'react-native';
+import { AppThemeProvider } from '../components/AppThemeProvider';
+import { Colors } from '@/constants/Colors';
 import { Stack } from 'expo-router';
 import * as SplashScreen from 'expo-splash-screen';
 import { StatusBar } from 'expo-status-bar';
@@ -92,15 +94,19 @@ export default function RootLayout() {
   }
 
   return (
-    <ThemeProvider value={colorScheme.isDark ? DarkTheme : DefaultTheme}>
-      <AuthProvider>
-        <NotificationProvider>
-          <AppDataProvider>
-            <RootLayoutNav />
-            <StatusBar style="auto" />
-          </AppDataProvider>
-        </NotificationProvider>
-      </AuthProvider>
+   <ThemeProvider value={colorScheme.isDark ? DarkTheme : DefaultTheme}>
+  <AppThemeProvider>
+    <AuthProvider>
+      <NotificationProvider>
+        <AppDataProvider>
+          <RootLayoutNav />
+          <StatusBar style="auto" />
+        </AppDataProvider>
+      </NotificationProvider>
+    </AuthProvider>
+  </AppThemeProvider>
+</ThemeProvider>
+
     </ThemeProvider>
   );
 }
@@ -110,7 +116,7 @@ const styles = StyleSheet.create({
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
-    backgroundColor: '#fff',
+    backgroundColor: Colors.light.background,
   },
   errorText: {
     fontSize: 18,
@@ -120,7 +126,7 @@ const styles = StyleSheet.create({
   },
   errorDetails: {
     fontSize: 14,
-    color: '#666',
+    color: Colors.light.icon,
     textAlign: 'center',
   },
 }); 

@@ -15,7 +15,9 @@ import { Ionicons } from '@expo/vector-icons';
 import { useAuth } from '../../contexts/AuthContext';
 import { useRouter } from 'expo-router';
 import { useColorScheme } from '../../hooks/useColorScheme';
+import { Colors } from '../../constants/Colors';
 import { createBackupZip } from '../../utils/backup';
+
 
 export default function Configuracoes() {
   const { user, signOut, updateProfile } = useAuth();
@@ -485,11 +487,20 @@ try {
   );
 
   return (
-    <SafeAreaView style={styles.container}>
+    <SafeAreaView
+      style={[
+        styles.container,
+        { backgroundColor: isDark ? Colors.dark.background : Colors.light.background },
+      ]}
+    >
       <ScrollView showsVerticalScrollIndicator={false}>
         {/* Header */}
         <View style={styles.header}>
-          <Text style={styles.title}>Configurações</Text>
+          <Text
+            style={[styles.title, { color: isDark ? Colors.dark.text : Colors.light.text }]}
+          >
+            Configurações
+          </Text>
         </View>
 
         {/* User Info */}

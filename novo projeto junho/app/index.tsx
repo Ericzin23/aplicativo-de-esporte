@@ -1,11 +1,14 @@
 import React, { useEffect } from 'react';
 import { View, ActivityIndicator, StyleSheet } from 'react-native';
+import { Colors } from '../constants/Colors';
+import { useColorScheme } from '../hooks/useColorScheme';
 import { useRouter } from 'expo-router';
 import { useAuth } from '../contexts/AuthContext';
 
 export default function Index() {
   const { user, isLoading } = useAuth();
   const router = useRouter();
+  const { isDark } = useColorScheme();
 
   useEffect(() => {
     if (!isLoading) {
@@ -18,7 +21,12 @@ export default function Index() {
   }, [user, isLoading]);
 
   return (
-    <View style={styles.container}>
+    <View
+      style={[
+        styles.container,
+        { backgroundColor: isDark ? Colors.dark.background : Colors.light.background },
+      ]}
+    >
       <ActivityIndicator size="large" color="#0066FF" />
     </View>
   );

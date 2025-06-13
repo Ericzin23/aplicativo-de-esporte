@@ -18,6 +18,8 @@ import { AntiAutofillInput } from '../components/AntiAutofillInput';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { SPORTS_CONFIG } from '../utils/sportsConfig';
 import DropDownPicker from 'react-native-dropdown-picker';
+import { Colors } from '../constants/Colors';
+import { useColorScheme } from '../hooks/useColorScheme';
 
 interface Professor {
   id: string;
@@ -43,6 +45,7 @@ export default function Cadastro() {
   
   const { signUp } = useAuth();
   const router = useRouter();
+  const { isDark } = useColorScheme();
 
   useEffect(() => {
     loadProfessors();
@@ -194,7 +197,10 @@ export default function Cadastro() {
 
   return (
     <KeyboardAvoidingView
-      style={styles.container}
+      style={[
+        styles.container,
+        { backgroundColor: isDark ? Colors.dark.background : Colors.light.background },
+      ]}
       behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
       keyboardVerticalOffset={Platform.OS === 'ios' ? 0 : 20}
     >
@@ -211,8 +217,16 @@ export default function Cadastro() {
             <Ionicons name="arrow-back" size={24} color="#0066FF" />
           </TouchableOpacity>
           <Ionicons name="person-add" size={80} color="#0066FF" />
-          <Text style={styles.title}>Criar Conta</Text>
-          <Text style={styles.subtitle}>Escolha o tipo de perfil e preencha os dados</Text>
+          <Text
+            style={[styles.title, { color: isDark ? Colors.dark.text : Colors.light.text }]}
+          >
+            Criar Conta
+          </Text>
+          <Text
+            style={[styles.subtitle, { color: isDark ? Colors.dark.icon : Colors.light.icon }]}
+          >
+            Escolha o tipo de perfil e preencha os dados
+          </Text>
         </View>
 
         <View style={styles.form}>
