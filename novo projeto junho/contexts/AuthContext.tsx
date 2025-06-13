@@ -8,8 +8,8 @@ interface User {
   password: string;
   avatar?: string;
   userType: 'professor' | 'atleta';
-  professorId?: string; // Para atletas, referência ao professor
-  sport?: string; // Para atletas, esporte que pratica
+  professorId?: string;
+  sport?: string;
   position?: string;
 }
 
@@ -17,7 +17,15 @@ interface AuthContextData {
   user: User | null;
   isLoading: boolean;
   signIn: (email: string, password: string) => Promise<void>;
-  signUp: (name: string, email: string, password: string, userType: 'professor' | 'atleta', professorId?: string, sport?: string, position?: string) => Promise<void>;
+  signUp: (
+    name: string,
+    email: string,
+    password: string,
+    userType: 'professor' | 'atleta',
+    professorId?: string,
+    sport?: string,
+    position?: string
+  ) => Promise<void>;
   signOut: () => Promise<void>;
   updateProfile: (userData: Partial<User>) => Promise<void>;
   updatePassword: (current: string, newPassword: string) => Promise<void>;
@@ -53,8 +61,6 @@ export function AuthProvider({ children }: AuthProviderProps) {
   async function signIn(email: string, password: string) {
     try {
       setIsLoading(true);
-
-      // Verificar se é um usuário cadastrado
       const storedUsers = await AsyncStorage.getItem('@GestaoTimes:users');
       const users = storedUsers ? JSON.parse(storedUsers) : [];
 
@@ -64,7 +70,6 @@ export function AuthProvider({ children }: AuthProviderProps) {
         await AsyncStorage.setItem('@GestaoTimes:user', JSON.stringify(foundUser));
         setUser(foundUser);
       } else if (email === 'admin@teste.com' && password === '123456') {
-        // Usuário admin padrão (professor)
         const userData: User = {
           id: '1',
           name: 'Eric',
@@ -73,13 +78,14 @@ export function AuthProvider({ children }: AuthProviderProps) {
           avatar: 'https://via.placeholder.com/150',
           userType: 'professor'
         };
-        
+
         await AsyncStorage.setItem('@GestaoTimes:user', JSON.stringify(userData));
         setUser(userData);
       } else {
         throw new Error('Email ou senha incorretos');
       }
     } catch (error) {
+      console.error('Erro no login:', error);
       throw error;
     } finally {
       setIsLoading(false);
@@ -96,13 +102,14 @@ export function AuthProvider({ children }: AuthProviderProps) {
     position?: string
   ) {
     try {
+      setIsLoading(true);
       const users = await AsyncStorage.getItem('@GestaoTimes:users');
       const parsedUsers = users ? JSON.parse(users) : [];
 
       const userExists = parsedUsers.find((user: User) => user.email === email);
 
       if (userExists) {
-        throw new Error('Usuário já existe');
+        throw new Error('Este e-mail já está em uso!');
       }
 
       const newUser: User = {
@@ -121,9 +128,13 @@ export function AuthProvider({ children }: AuthProviderProps) {
         JSON.stringify([...parsedUsers, newUser])
       );
 
+      await AsyncStorage.setItem('@GestaoTimes:user', JSON.stringify(newUser));
       setUser(newUser);
     } catch (error) {
-      throw error;
+      console.error('Erro no cadastro:', error);
+      throw error; // Isso permite que o componente capture e exiba o erro
+    } finally {
+      setIsLoading(false);
     }
   }
 
@@ -140,24 +151,21 @@ export function AuthProvider({ children }: AuthProviderProps) {
     try {
       if (user) {
         const updatedUser = { ...user, ...userData };
-        
-        // Atualizar usuário atual
         await AsyncStorage.setItem('@GestaoTimes:user', JSON.stringify(updatedUser));
-        
-        // Atualizar na lista de usuários
+
         const storedUsers = await AsyncStorage.getItem('@GestaoTimes:users');
         const users = storedUsers ? JSON.parse(storedUsers) : [];
         const userIndex = users.findIndex((u: User) => u.id === user.id);
-        
+
         if (userIndex !== -1) {
           users[userIndex] = updatedUser;
           await AsyncStorage.setItem('@GestaoTimes:users', JSON.stringify(users));
         }
-        
+
         setUser(updatedUser);
       }
     } catch (error) {
-      throw error;
+      console.error('Erro ao atualizar perfil:', error);
     }
   }
 
@@ -203,4 +211,4 @@ export function useAuth() {
     throw new Error('useAuth deve ser usado dentro de um AuthProvider');
   }
   return context;
-} 
+}
