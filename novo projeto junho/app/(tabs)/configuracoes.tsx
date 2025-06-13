@@ -140,14 +140,21 @@ export default function Configuracoes() {
           text: 'Fazer Backup',
           onPress: async () => {
             try {
-              if (user) {
-                await createBackupZip({ user });
-              }
-              Alert.alert('Sucesso!', 'Backup realizado com sucesso!');
-            } catch (e) {
-              Alert.alert('Erro', 'Não foi possível gerar o backup.');
-            }
-          },
+try {
+  const path = user
+    ? await createBackupZip({ user })
+    : await createBackupZip();
+
+  Alert.alert(
+    'Sucesso!',
+    typeof path === 'string'
+      ? `Backup salvo em: ${path}`
+      : 'Backup realizado com sucesso!'
+  );
+} catch (e) {
+  Alert.alert('Erro', 'Não foi possível gerar o backup.');
+}
+
         },
       ]
     );

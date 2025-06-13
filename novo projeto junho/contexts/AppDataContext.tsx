@@ -1,5 +1,6 @@
 import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
 import { getItem, setItem, StorageKeys } from '../utils/storage';
+import { useNotifications } from './NotificationContext';
 
 interface Team {
   id: string;
@@ -36,13 +37,23 @@ interface Event {
   createdAt: string;
 }
 
+interface Guidance {
+  id: string;
+  tipo: string;
+  titulo: string;
+  descricao: string;
+  data: string;
+}
+
 interface AppDataContextType {
   teams: Team[];
   players: Player[];
   events: Event[];
-  addTeam: (team: Omit<Team, 'id' | 'createdAt'>) => void;
-  addPlayer: (player: Omit<Player, 'id' | 'createdAt'>) => void;
-  addEvent: (event: Omit<Event, 'id' | 'createdAt'>) => void;
+  addTeam: (team: Omit<Team, 'id' | 'createdAt'>) => Promise<void>;
+  addPlayer: (player: Omit<Player, 'id' | 'createdAt'>) => Promise<void>;
+  addEvent: (event: Omit<Event, 'id' | 'createdAt'>) => Promise<void>;
+  addGuidance: (playerId: string, guidance: Omit<Guidance, 'id'>) => Promise<void>;
+  addPlayerStats: (playerId: string, stats: Record<string, number>) => Promise<void>;
   updateTeam: (id: string, team: Partial<Team>) => void;
   updatePlayer: (id: string, player: Partial<Player>) => void;
   deleteTeam: (id: string) => void;
@@ -60,6 +71,8 @@ interface AppDataContextType {
     todayGames: number;
     todayTrainings: number;
   };
+  syncProfessorToAluno: (data: Partial<AppDataContextType>) => void;
+  syncAlunoToProfessor: (data: Partial<AppDataContextType>) => void;
 }
 
 const AppDataContext = createContext<AppDataContextType | undefined>(undefined);
@@ -174,6 +187,7 @@ export function AppDataProvider({ children }: { children: ReactNode }) {
   const [teams, setTeams] = useState<Team[]>([]);
   const [players, setPlayers] = useState<Player[]>([]);
   const [events, setEvents] = useState<Event[]>([]);
+  const { notifyEvent, notifyStats, notifyGuidance } = useNotifications();
 
   // Carregar dados do storage
   useEffect(() => {
@@ -304,6 +318,30 @@ export function AppDataProvider({ children }: { children: ReactNode }) {
     };
     const newEvents = [...events, newEvent];
     await saveEvents(newEvents);
+    await notifyEvent('Novo evento', `${newEvent.title} em ${newEvent.date}`);
+  };
+
+  const addGuidance = async (
+    playerId: string,
+    guidanceData: Omit<Guidance, 'id'>
+  ) => {
+    const storageKey = `@GestaoTimes:guidance_${playerId}`;
+    const stored = await getItem<Guidance[]>(storageKey);
+    const newGuidance: Guidance = { ...guidanceData, id: Date.now().toString() };
+    const list = stored ? [...stored, newGuidance] : [newGuidance];
+    await setItem(storageKey, list);
+    await notifyGuidance('Nova orientação', newGuidance.titulo);
+  };
+
+  const addPlayerStats = async (
+    playerId: string,
+    stats: Record<string, number>
+  ) => {
+    const storageKey = `@GestaoTimes:player_stats_${playerId}`;
+    const stored = await getItem<Record<string, number>>(storageKey);
+    const updated = { ...(stored || {}), ...stats };
+    await setItem(storageKey, updated);
+    await notifyStats('Estatísticas atualizadas', 'Confira suas novas estatísticas');
   };
 
   const updateTeam = async (id: string, teamData: Partial<Team>) => {
@@ -373,6 +411,33 @@ export function AppDataProvider({ children }: { children: ReactNode }) {
     };
   };
 
+  // INÍCIO - FUNÇÕES DE SINCRONIZAÇÃO
+  const syncProfessorToAluno = async (
+    data: Partial<AppDataContextType>
+  ) => {
+    try {
+      console.log('🔄 Sincronizando dados do professor -> aluno');
+      if (data.teams) setTeams(data.teams);
+      if (data.players) setPlayers(data.players);
+      if (data.events) setEvents(data.events);
+    } catch (error) {
+      console.error('Erro ao sincronizar professor -> aluno:', error);
+    }
+  };
+
+  const syncAlunoToProfessor = async (
+    data: Partial<AppDataContextType>
+  ) => {
+    try {
+      console.log('🔄 Sincronizando dados do aluno -> professor');
+      // Aqui você poderia enviar os dados para o backend
+      // await apiService.syncAluno(data);
+    } catch (error) {
+      console.error('Erro ao sincronizar aluno -> professor:', error);
+    }
+  };
+  // FIM - FUNÇÕES DE SINCRONIZAÇÃO
+
   return (
     <AppDataContext.Provider value={{
       teams,
@@ -381,6 +446,8 @@ export function AppDataProvider({ children }: { children: ReactNode }) {
       addTeam,
       addPlayer,
       addEvent,
+      addGuidance,
+      addPlayerStats,
       updateTeam,
       updatePlayer,
       deleteTeam,
@@ -393,6 +460,8 @@ export function AppDataProvider({ children }: { children: ReactNode }) {
       getTodayEvents,
       getUpcomingEvents,
       getStats,
+      syncProfessorToAluno,
+      syncAlunoToProfessor,
     }}>
       {children}
     </AppDataContext.Provider>
