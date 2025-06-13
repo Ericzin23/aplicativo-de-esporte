@@ -5,19 +5,30 @@ interface User {
   id: string;
   name: string;
   email: string;
+  password: string;
   avatar?: string;
   userType: 'professor' | 'atleta';
-  professorId?: string; // Para atletas, referência ao professor
-  sport?: string; // Para atletas, esporte que pratica
+  professorId?: string;
+  sport?: string;
+  position?: string;
 }
 
 interface AuthContextData {
   user: User | null;
   isLoading: boolean;
   signIn: (email: string, password: string) => Promise<void>;
-  signUp: (name: string, email: string, password: string, userType: 'professor' | 'atleta', professorId?: string, sport?: string) => Promise<void>;
+  signUp: (
+    name: string,
+    email: string,
+    password: string,
+    userType: 'professor' | 'atleta',
+    professorId?: string,
+    sport?: string,
+    position?: string
+  ) => Promise<void>;
   signOut: () => Promise<void>;
   updateProfile: (userData: Partial<User>) => Promise<void>;
+  updatePassword: (current: string, newPassword: string) => Promise<void>;
 }
 
 const AuthContext = createContext<AuthContextData>({} as AuthContextData);
@@ -50,26 +61,24 @@ export function AuthProvider({ children }: AuthProviderProps) {
   async function signIn(email: string, password: string) {
     try {
       setIsLoading(true);
-      
-      // Verificar se é um usuário cadastrado
       const storedUsers = await AsyncStorage.getItem('@GestaoTimes:users');
       const users = storedUsers ? JSON.parse(storedUsers) : [];
-      
+
       const foundUser = users.find((u: User) => u.email === email);
-      
-      if (foundUser && password === '123456') { // Senha padrão para demo
+
+      if (foundUser && foundUser.password === password) {
         await AsyncStorage.setItem('@GestaoTimes:user', JSON.stringify(foundUser));
         setUser(foundUser);
       } else if (email === 'admin@teste.com' && password === '123456') {
-        // Usuário admin padrão (professor)
         const userData: User = {
           id: '1',
           name: 'Eric',
           email: email,
+          password: '123456',
           avatar: 'https://via.placeholder.com/150',
           userType: 'professor'
         };
-        
+
         await AsyncStorage.setItem('@GestaoTimes:user', JSON.stringify(userData));
         setUser(userData);
       } else {
@@ -77,43 +86,53 @@ export function AuthProvider({ children }: AuthProviderProps) {
       }
     } catch (error) {
       console.error('Erro no login:', error);
+      throw error;
     } finally {
       setIsLoading(false);
     }
   }
 
-  async function signUp(name: string, email: string, password: string, userType: 'professor' | 'atleta', professorId?: string, sport?: string) {
+  async function signUp(
+    name: string,
+    email: string,
+    password: string,
+    userType: 'professor' | 'atleta',
+    professorId?: string,
+    sport?: string,
+    position?: string
+  ) {
     try {
       setIsLoading(true);
-      
-      // Verificar se email já existe
-      const storedUsers = await AsyncStorage.getItem('@GestaoTimes:users');
-      const users = storedUsers ? JSON.parse(storedUsers) : [];
-      
-      const existingUser = users.find((u: User) => u.email === email);
-      if (existingUser) {
-        throw new Error('Este email já está cadastrado');
+      const users = await AsyncStorage.getItem('@GestaoTimes:users');
+      const parsedUsers = users ? JSON.parse(users) : [];
+
+      const userExists = parsedUsers.find((user: User) => user.email === email);
+
+      if (userExists) {
+        throw new Error('Este e-mail já está em uso!');
       }
-      
-      const userData: User = {
+
+      const newUser: User = {
         id: Date.now().toString(),
-        name: name,
-        email: email,
-        avatar: 'https://via.placeholder.com/150',
-        userType: userType,
+        name,
+        email,
+        password,
+        userType,
         ...(userType === 'atleta' && professorId && { professorId }),
-        ...(userType === 'atleta' && sport && { sport })
+        ...(userType === 'atleta' && sport && { sport }),
+        ...(userType === 'atleta' && position && { position }),
       };
-      
-      // Salvar na lista de usuários
-      users.push(userData);
-      await AsyncStorage.setItem('@GestaoTimes:users', JSON.stringify(users));
-      
-      // Salvar como usuário atual
-      await AsyncStorage.setItem('@GestaoTimes:user', JSON.stringify(userData));
-      setUser(userData);
+
+      await AsyncStorage.setItem(
+        '@GestaoTimes:users',
+        JSON.stringify([...parsedUsers, newUser])
+      );
+
+      await AsyncStorage.setItem('@GestaoTimes:user', JSON.stringify(newUser));
+      setUser(newUser);
     } catch (error) {
       console.error('Erro no cadastro:', error);
+      throw error; // Isso permite que o componente capture e exiba o erro
     } finally {
       setIsLoading(false);
     }
@@ -132,25 +151,41 @@ export function AuthProvider({ children }: AuthProviderProps) {
     try {
       if (user) {
         const updatedUser = { ...user, ...userData };
-        
-        // Atualizar usuário atual
         await AsyncStorage.setItem('@GestaoTimes:user', JSON.stringify(updatedUser));
-        
-        // Atualizar na lista de usuários
+
         const storedUsers = await AsyncStorage.getItem('@GestaoTimes:users');
         const users = storedUsers ? JSON.parse(storedUsers) : [];
         const userIndex = users.findIndex((u: User) => u.id === user.id);
-        
+
         if (userIndex !== -1) {
           users[userIndex] = updatedUser;
           await AsyncStorage.setItem('@GestaoTimes:users', JSON.stringify(users));
         }
-        
+
         setUser(updatedUser);
       }
     } catch (error) {
       console.error('Erro ao atualizar perfil:', error);
     }
+  }
+
+  async function updatePassword(current: string, newPassword: string) {
+    if (!user) return;
+
+    const storedUsers = await AsyncStorage.getItem('@GestaoTimes:users');
+    const users = storedUsers ? JSON.parse(storedUsers) : [];
+    const userIndex = users.findIndex((u: User) => u.id === user.id);
+
+    if (userIndex === -1 || users[userIndex].password !== current) {
+      throw new Error('Senha atual incorreta');
+    }
+
+    users[userIndex].password = newPassword;
+    await AsyncStorage.setItem('@GestaoTimes:users', JSON.stringify(users));
+
+    const updated = { ...user, password: newPassword };
+    await AsyncStorage.setItem('@GestaoTimes:user', JSON.stringify(updated));
+    setUser(updated);
   }
 
   return (
@@ -162,6 +197,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
         signUp,
         signOut,
         updateProfile,
+        updatePassword,
       }}
     >
       {children}
@@ -175,4 +211,4 @@ export function useAuth() {
     throw new Error('useAuth deve ser usado dentro de um AuthProvider');
   }
   return context;
-} 
+}

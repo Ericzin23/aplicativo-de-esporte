@@ -20,7 +20,7 @@ import { formatPhone } from '../utils/validators';
 
 export default function EditarPerfil() {
   const router = useRouter();
-  const { user, updateProfile } = useAuth();
+  const { user, updateProfile, updatePassword } = useAuth();
 
   const [nome, setNome] = useState(user?.name || '');
   const [email, setEmail] = useState(user?.email || '');
@@ -33,6 +33,9 @@ export default function EditarPerfil() {
   const [esporte, setEsporte] = useState('');
   const [posicao, setPosicao] = useState('');
   const [loading, setLoading] = useState(false);
+  const [currentPassword, setCurrentPassword] = useState('');
+  const [newPassword, setNewPassword] = useState('');
+  const [confirmPassword, setConfirmPassword] = useState('');
 
   useEffect(() => {
     carregarDadosPerfil();
@@ -83,15 +86,48 @@ export default function EditarPerfil() {
       return;
     }
 
+    const alteringPassword =
+      currentPassword || newPassword || confirmPassword;
+
+    if (alteringPassword) {
+      if (!currentPassword || !newPassword || !confirmPassword) {
+        Alert.alert('Erro', 'Preencha todos os campos de senha.');
+        return;
+      }
+
+      if (newPassword !== confirmPassword) {
+        Alert.alert('Erro', 'A nova senha e a confirmação não coincidem.');
+        return;
+      }
+
+      const passwordRegex = /^(?=.*\d)(?=.*[^A-Za-z0-9]).{8,}$/;
+      if (!passwordRegex.test(newPassword)) {
+        Alert.alert(
+          'Erro',
+          'A senha precisa ter no mínimo 8 caracteres, 1 número e 1 símbolo.'
+        );
+        return;
+      }
+
+      if (currentPassword !== user?.password) {
+        Alert.alert('Erro', 'Senha atual incorreta.');
+        return;
+      }
+    }
+
     try {
       setLoading(true);
 
       // Atualizar dados do usuário no contexto de autenticação
-      await updateProfile({ 
-        name: nome, 
+      await updateProfile({
+        name: nome,
         email,
         avatar: imagem || undefined
       });
+
+      if (alteringPassword) {
+        await updatePassword(currentPassword, newPassword);
+      }
 
       // Salvar dados profissionais
       const dadosProfissionais = {
@@ -125,6 +161,9 @@ export default function EditarPerfil() {
           onPress: () => router.back()
         }
       ]);
+      setCurrentPassword('');
+      setNewPassword('');
+      setConfirmPassword('');
     } catch (error) {
       console.error('Erro ao salvar perfil:', error);
       Alert.alert('Erro', 'Não foi possível salvar o perfil.');
@@ -175,12 +214,49 @@ export default function EditarPerfil() {
           {/* Email (Travado) */}
           <View style={styles.inputGroup}>
             <Text style={styles.label}>E-mail</Text>
-            <TextInput
-              style={[styles.input, styles.inputDisabled]}
-              value={email}
-              editable={false}
-            />
-          </View>
+          <TextInput
+            style={[styles.input, styles.inputDisabled]}
+            value={email}
+            editable={false}
+          />
+        </View>
+
+        {/* Senhas */}
+        <View style={styles.inputGroup}>
+          <Text style={styles.label}>Senha Atual</Text>
+          <TextInput
+            style={styles.input}
+            placeholder="Digite sua senha atual"
+            placeholderTextColor="#999"
+            secureTextEntry
+            value={currentPassword}
+            onChangeText={setCurrentPassword}
+          />
+        </View>
+
+        <View style={styles.inputGroup}>
+          <Text style={styles.label}>Nova Senha</Text>
+          <TextInput
+            style={styles.input}
+            placeholder="Nova senha"
+            placeholderTextColor="#999"
+            secureTextEntry
+            value={newPassword}
+            onChangeText={setNewPassword}
+          />
+        </View>
+
+        <View style={styles.inputGroup}>
+          <Text style={styles.label}>Confirmar Nova Senha</Text>
+          <TextInput
+            style={styles.input}
+            placeholder="Confirme a nova senha"
+            placeholderTextColor="#999"
+            secureTextEntry
+            value={confirmPassword}
+            onChangeText={setConfirmPassword}
+          />
+        </View>
 
           {/* Telefone */}
           <View style={styles.inputGroup}>

@@ -17,6 +17,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { AntiAutofillInput } from '../components/AntiAutofillInput';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { SPORTS_CONFIG } from '../utils/sportsConfig';
+import DropDownPicker from 'react-native-dropdown-picker';
 
 interface Professor {
   id: string;
@@ -36,6 +37,9 @@ export default function Cadastro() {
   const [selectedProfessor, setSelectedProfessor] = useState<string>('');
   const [professors, setProfessors] = useState<Professor[]>([]);
   const [selectedSport, setSelectedSport] = useState<string>('');
+  const [openPosicao, setOpenPosicao] = useState(false);
+  const [selectedPosicao, setSelectedPosicao] = useState<string>('');
+  const [posicoesDisponiveis, setPosicoesDisponiveis] = useState<Array<{label: string, value: string}>>([]);
   
   const { signUp } = useAuth();
   const router = useRouter();
@@ -43,6 +47,16 @@ export default function Cadastro() {
   useEffect(() => {
     loadProfessors();
   }, []);
+
+  useEffect(() => {
+    if (selectedSport) {
+      const posicoes = getSportPositions(selectedSport).map(pos => ({
+        label: pos.charAt(0).toUpperCase() + pos.slice(1),
+        value: pos
+      }));
+      setPosicoesDisponiveis(posicoes);
+    }
+  }, [selectedSport]);
 
   // Hook para limpar autofill quando a tela for focada
   useFocusEffect(
@@ -65,6 +79,11 @@ export default function Cadastro() {
       const storedUsers = await AsyncStorage.getItem('@GestaoTimes:users');
       const users = storedUsers ? JSON.parse(storedUsers) : [];
       
+      // Filtrar apenas usuários do tipo professor
+      const professorsList = users.filter((user: any) => 
+        user.userType === 'professor' && user.email !== 'admin@teste.com'
+      );
+      
       // Adicionar professor padrão se não existir
       const defaultProfessor = {
         id: '1',
@@ -72,8 +91,6 @@ export default function Cadastro() {
         email: 'admin@teste.com',
         userType: 'professor'
       };
-      
-      const professorsList = users.filter((user: any) => user.userType === 'professor');
       
       // Verificar se o professor padrão já existe
       const hasDefaultProfessor = professorsList.some((prof: any) => prof.email === 'admin@teste.com');
@@ -85,8 +102,34 @@ export default function Cadastro() {
       setProfessors(professorsList);
     } catch (error) {
       console.log('Erro ao carregar professores:', error);
+      Alert.alert('Erro', 'Não foi possível carregar a lista de professores');
     }
   }
+
+  const getSportPositions = (sport: string) => {
+    const posicoes = {
+      futebol: ['Goleiro', 'Zagueiro', 'Lateral', 'Meio-Campo', 'Atacante'],
+      basquete: ['Armador', 'Ala-Armador', 'Ala', 'Ala-Pivô', 'Pivô'],
+      volei: ['Levantador', 'Oposto', 'Ponteiro', 'Central', 'Líbero'],
+      natacao: ['Nado Livre', 'Nado Costas', 'Nado Peito', 'Nado Borboleta', 'Medley'],
+      tenis: ['Simples', 'Duplas'],
+      boxe: ['Peso Mosca', 'Peso Galo', 'Peso Pena', 'Peso Leve', 'Peso Médio'],
+      mma: ['Peso Palha', 'Peso Mosca', 'Peso Galo', 'Peso Pena', 'Peso Leve'],
+      karate: ['Faixa Branca', 'Faixa Amarela', 'Faixa Verde', 'Faixa Azul', 'Faixa Roxa', 'Faixa Marrom', 'Faixa Preta'],
+      judo: ['Faixa Branca', 'Faixa Amarela', 'Faixa Verde', 'Faixa Azul', 'Faixa Roxa', 'Faixa Marrom', 'Faixa Preta'],
+      ciclismo: ['Estrada', 'Mountain Bike', 'BMX', 'Pista'],
+      handebol: ['Goleiro', 'Ponta', 'Meio', 'Armador', 'Pivô'],
+      rugby: ['Pilar', 'Hooker', 'Segunda Linha', 'Terceira Linha', 'Meio Scrum', 'Abertura', 'Centro', 'Ponta', 'Fullback'],
+      golfe: ['Profissional', 'Amador'],
+      surfe: ['Shortboard', 'Longboard', 'Bodyboard', 'SUP'],
+      skate: ['Street', 'Vert', 'Park', 'Freestyle'],
+      tenisMesa: ['Simples', 'Duplas'],
+      badminton: ['Simples', 'Duplas'],
+      esgrima: ['Florete', 'Espada', 'Sabre'],
+      hipismo: ['Adestramento', 'Saltos', 'Concurso Completo']
+    };
+    return posicoes[sport as keyof typeof posicoes] || [];
+  };
 
   async function handleSignUp() {
     if (!name || !email || !password || !confirmPassword || !userType) {
@@ -94,14 +137,19 @@ export default function Cadastro() {
       return;
     }
 
-    if (userType === 'atleta' && !selectedProfessor) {
-      Alert.alert('Erro', 'Por favor, selecione um professor');
-      return;
-    }
-
-    if (userType === 'atleta' && !selectedSport) {
-      Alert.alert('Erro', 'Por favor, selecione um esporte');
-      return;
+    if (userType === 'atleta') {
+      if (!selectedProfessor) {
+        Alert.alert('Erro', 'Por favor, selecione um professor');
+        return;
+      }
+      if (!selectedSport) {
+        Alert.alert('Erro', 'Por favor, selecione um esporte');
+        return;
+      }
+      if (!selectedPosicao) {
+        Alert.alert('Erro', 'Por favor, selecione sua posição');
+        return;
+      }
     }
 
     if (password !== confirmPassword) {
@@ -116,7 +164,7 @@ export default function Cadastro() {
 
     try {
       setIsLoading(true);
-      await signUp(name, email, password, userType, selectedProfessor, selectedSport);
+      await signUp(name, email, password, userType, selectedProfessor, selectedSport, selectedPosicao);
       router.replace(userType === 'professor' ? '/(tabs)' : '/(atleta)');
     } catch (error) {
       Alert.alert('Erro', error instanceof Error ? error.message : 'Erro ao criar conta');
@@ -215,7 +263,10 @@ export default function Cadastro() {
                       styles.sportCard,
                       selectedSport === sport.id && styles.sportCardSelected
                     ]}
-                    onPress={() => setSelectedSport(sport.id)}
+                    onPress={() => {
+                      setSelectedSport(sport.id);
+                      setSelectedPosicao(''); // Reset posição quando mudar o esporte
+                    }}
                   >
                     <Ionicons 
                       name={sport.icon as any} 
@@ -234,6 +285,32 @@ export default function Cadastro() {
                   </TouchableOpacity>
                 ))}
               </View>
+
+              {/* Seleção de Posição */}
+              {selectedSport && (
+                <View style={styles.posicaoSection}>
+                  <Text style={styles.sectionTitle}>Sua Posição</Text>
+                  <Text style={styles.sectionSubtitle}>
+                    {selectedSport === 'jiujitsu' || selectedSport === 'judo' ? 'Selecione sua Faixa' :
+                     selectedSport === 'capoeira' ? 'Selecione sua Corda' :
+                     selectedSport === 'boxe' || selectedSport === 'mma' ? 'Selecione sua Categoria' :
+                     'Selecione sua Posição'}
+                  </Text>
+                  <DropDownPicker
+                    items={posicoesDisponiveis}
+                    placeholder="Selecione sua posição"
+                    open={openPosicao}
+                    setOpen={setOpenPosicao}
+                    value={selectedPosicao}
+                    setValue={setSelectedPosicao}
+                    style={styles.dropdown}
+                    dropDownContainerStyle={styles.dropdownContainer}
+                    zIndex={3000}
+                    zIndexInverse={1000}
+                    listMode="MODAL"
+                  />
+                </View>
+              )}
             </View>
           )}
 
@@ -647,5 +724,17 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: '#0066FF',
     fontWeight: 'bold',
+  },
+  posicaoSection: {
+    marginTop: 20,
+  },
+  dropdown: {
+    borderColor: '#0066FF',
+    backgroundColor: '#f9f9f9',
+    marginBottom: 20,
+  },
+  dropdownContainer: {
+    borderColor: '#0066FF',
+    backgroundColor: '#f9f9f9',
   },
 }); 
