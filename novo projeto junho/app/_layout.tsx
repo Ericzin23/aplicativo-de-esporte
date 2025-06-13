@@ -6,6 +6,7 @@ import { Stack } from 'expo-router';
 import * as SplashScreen from 'expo-splash-screen';
 import { StatusBar } from 'expo-status-bar';
 import { AuthProvider, useAuth } from '../contexts/AuthContext';
+import { NotificationProvider } from '../contexts/NotificationContext';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { DarkTheme, DefaultTheme, ThemeProvider } from '@react-navigation/native';
 import { useFonts } from 'expo-font';
@@ -93,15 +94,19 @@ export default function RootLayout() {
   }
 
   return (
-    <ThemeProvider value={colorScheme.isDark ? DarkTheme : DefaultTheme}>
-      <AppThemeProvider>
-        <AuthProvider>
-          <AppDataProvider>
-            <RootLayoutNav />
-            <StatusBar style="auto" />
-          </AppDataProvider>
-        </AuthProvider>
-      </AppThemeProvider>
+   <ThemeProvider value={colorScheme.isDark ? DarkTheme : DefaultTheme}>
+  <AppThemeProvider>
+    <AuthProvider>
+      <NotificationProvider>
+        <AppDataProvider>
+          <RootLayoutNav />
+          <StatusBar style="auto" />
+        </AppDataProvider>
+      </NotificationProvider>
+    </AuthProvider>
+  </AppThemeProvider>
+</ThemeProvider>
+
     </ThemeProvider>
   );
 }

@@ -16,6 +16,8 @@ import { useAuth } from '../../contexts/AuthContext';
 import { useRouter } from 'expo-router';
 import { useColorScheme } from '../../hooks/useColorScheme';
 import { Colors } from '../../constants/Colors';
+import { createBackupZip } from '../../utils/backup';
+
 
 export default function Configuracoes() {
   const { user, signOut, updateProfile } = useAuth();
@@ -133,17 +135,28 @@ export default function Configuracoes() {
   const handleBackup = async () => {
     Alert.alert(
       'Backup dos Dados',
-      'Deseja fazer backup de todos os seus dados (times, jogadores, eventos)?',
+      'Deseja gerar e salvar um backup completo no dispositivo?',
       [
         { text: 'Cancelar', style: 'cancel' },
-        { 
-          text: 'Fazer Backup', 
-          onPress: () => {
-            // Simular backup
-            setTimeout(() => {
-              Alert.alert('Sucesso!', 'Backup realizado com sucesso!');
-            }, 1000);
-          }
+        {
+          text: 'Fazer Backup',
+          onPress: async () => {
+            try {
+try {
+  const path = user
+    ? await createBackupZip({ user })
+    : await createBackupZip();
+
+  Alert.alert(
+    'Sucesso!',
+    typeof path === 'string'
+      ? `Backup salvo em: ${path}`
+      : 'Backup realizado com sucesso!'
+  );
+} catch (e) {
+  Alert.alert('Erro', 'Não foi possível gerar o backup.');
+}
+
         },
       ]
     );

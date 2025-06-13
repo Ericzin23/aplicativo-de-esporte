@@ -14,6 +14,7 @@ import { useAuth } from '../../contexts/AuthContext';
 import { useRouter } from 'expo-router';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { getSportConfig, getSportStatistics, getSportPositions } from '../../utils/sportsConfig';
+import OrientacaoItem, { Orientacao } from '../../components/OrientacaoItem';
 
 interface AtletaStats {
   [key: string]: any;
@@ -26,14 +27,6 @@ interface AtletaStats {
   cartoes: number;
 }
 
-interface Orientacao {
-  id: string;
-  tipo: string;
-  titulo: string;
-  descricao: string;
-  data: string;
-  lida: boolean;
-}
 
 export default function AtletaHome() {
   const { user } = useAuth();
@@ -183,6 +176,10 @@ export default function AtletaHome() {
   };
 
   const orientacaoNaoLidas = orientacoes.filter(o => !o.lida);
+  const orientacoesOrdenadas = [...orientacoes].sort(
+    (a, b) => new Date(b.data).getTime() - new Date(a.data).getTime()
+  );
+  const orientacaoDestaque = orientacoesOrdenadas[0];
 
   return (
     <SafeAreaView style={styles.container}>
@@ -264,32 +261,13 @@ export default function AtletaHome() {
         {/* Orientações do Professor */}
         <View style={styles.orientacoesSection}>
           <Text style={styles.sectionTitle}>Orientações do Professor</Text>
-          {orientacoes.length > 0 ? (
+          {orientacaoDestaque ? (
             <View style={styles.orientacoesList}>
-              {orientacoes.slice(0, 2).map((orientacao, index) => (
-                <View key={index} style={styles.orientacaoCard}>
-                  <View style={styles.orientacaoHeader}>
-                    <Ionicons 
-                      name={orientacao.tipo === 'treino' ? 'basketball' : 
-                            orientacao.tipo === 'alimentacao' ? 'nutrition' : 
-                            orientacao.tipo === 'recuperacao' ? 'fitness' : 'chatbubble'} 
-                      size={24} 
-                      color="#4CAF50" 
-                    />
-                    <Text style={styles.orientacaoTipo}>
-                      {orientacao.tipo === 'treino' ? 'Treino' :
-                       orientacao.tipo === 'alimentacao' ? 'Alimentação' :
-                       orientacao.tipo === 'recuperacao' ? 'Recuperação' : 'Geral'}
-                    </Text>
-                  </View>
-                  <Text style={styles.orientacaoTexto} numberOfLines={2}>
-                    {orientacao.descricao}
-                  </Text>
-                  <Text style={styles.orientacaoData}>
-                    {new Date(orientacao.data).toLocaleDateString('pt-BR')}
-                  </Text>
-                </View>
-              ))}
+              <OrientacaoItem
+                orientacao={orientacaoDestaque}
+                highlight
+                onMarkAsRead={marcarOrientacaoLida}
+              />
             </View>
           ) : (
             <View style={styles.noOrientacoesCard}>
@@ -500,43 +478,6 @@ const styles = StyleSheet.create({
   },
   orientacoesList: {
     marginBottom: 15,
-  },
-  orientacaoCard: {
-    backgroundColor: '#f8f9fa',
-    borderRadius: 12,
-    padding: 15,
-    marginBottom: 10,
-  },
-  orientacaoHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginBottom: 8,
-  },
-  orientacaoIcon: {
-    width: 32,
-    height: 32,
-    borderRadius: 16,
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginRight: 10,
-  },
-  orientacaoInfo: {
-    flex: 1,
-  },
-  orientacaoTitulo: {
-    fontSize: 16,
-    fontWeight: 'bold',
-    color: '#333',
-  },
-  orientacaoData: {
-    fontSize: 12,
-    color: '#666',
-    marginTop: 2,
-  },
-  orientacaoDescricao: {
-    fontSize: 14,
-    color: '#666',
-    lineHeight: 20,
   },
   noOrientacoesCard: {
     backgroundColor: '#fff',

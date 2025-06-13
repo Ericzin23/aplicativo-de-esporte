@@ -1,10 +1,12 @@
 import { Tabs } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { useAuth } from '../../contexts/AuthContext';
+import { useNotifications } from '../../contexts/NotificationContext';
 import { Redirect } from 'expo-router';
 
 export default function AtletaLayout() {
   const { user } = useAuth();
+  const { badges } = useNotifications();
 
   // Redirecionar se não for atleta
   if (user && user.userType !== 'atleta') {
@@ -59,6 +61,7 @@ export default function AtletaLayout() {
           tabBarIcon: ({ color, size }) => (
             <Ionicons name="stats-chart" size={size} color={color} />
           ),
+          tabBarBadge: badges.stats ? '' : undefined,
           headerTitle: 'Minhas Estatísticas',
         }}
       />
@@ -69,6 +72,7 @@ export default function AtletaLayout() {
           tabBarIcon: ({ color, size }) => (
             <Ionicons name="school" size={size} color={color} />
           ),
+          tabBarBadge: badges.guidance ? '' : undefined,
           headerTitle: 'Orientações do Professor',
         }}
       />
@@ -79,6 +83,7 @@ export default function AtletaLayout() {
           tabBarIcon: ({ color, size }) => (
             <Ionicons name="calendar" size={size} color={color} />
           ),
+          tabBarBadge: badges.events ? '' : undefined,
           headerTitle: 'Minha Agenda',
         }}
       />

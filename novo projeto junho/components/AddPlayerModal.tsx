@@ -280,7 +280,7 @@ export function AddPlayerModal({ visible, onClose, editingPlayer }: AddPlayerMod
                 </View>
               ) : (
                 <Text style={styles.noTeamsText}>
-                  ⚠️ Nenhum time de {sports.find(s => s.value === sport)?.label} encontrado. Crie um time primeiro na aba "Times".
+                  ⚠️ Nenhum time de {sports.find(s => s.value === sport)?.label} encontrado. Crie um time primeiro na aba &quot;Times&quot;.
                 </Text>
               )}
             </View>
