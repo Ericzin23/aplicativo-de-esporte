@@ -133,19 +133,28 @@ export default function Configuracoes() {
   const handleBackup = async () => {
     Alert.alert(
       'Backup dos Dados',
-      'Deseja fazer backup de todos os seus dados (times, jogadores, eventos)?',
+      'Deseja gerar e salvar um backup completo no dispositivo?',
       [
         { text: 'Cancelar', style: 'cancel' },
         {
           text: 'Fazer Backup',
           onPress: async () => {
             try {
-              const path = await createBackupZip();
-              Alert.alert('Sucesso!', `Backup salvo em: ${path}`);
-            } catch (e) {
-              Alert.alert('Erro', 'Não foi possível gerar o backup.');
-            }
-          }
+try {
+  const path = user
+    ? await createBackupZip({ user })
+    : await createBackupZip();
+
+  Alert.alert(
+    'Sucesso!',
+    typeof path === 'string'
+      ? `Backup salvo em: ${path}`
+      : 'Backup realizado com sucesso!'
+  );
+} catch (e) {
+  Alert.alert('Erro', 'Não foi possível gerar o backup.');
+}
+
         },
       ]
     );
