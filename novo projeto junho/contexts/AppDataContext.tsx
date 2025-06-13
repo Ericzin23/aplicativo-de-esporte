@@ -71,6 +71,8 @@ interface AppDataContextType {
     todayGames: number;
     todayTrainings: number;
   };
+  syncProfessorToAluno: (data: Partial<AppDataContextType>) => void;
+  syncAlunoToProfessor: (data: Partial<AppDataContextType>) => void;
 }
 
 const AppDataContext = createContext<AppDataContextType | undefined>(undefined);
@@ -409,6 +411,33 @@ export function AppDataProvider({ children }: { children: ReactNode }) {
     };
   };
 
+  // INÍCIO - FUNÇÕES DE SINCRONIZAÇÃO
+  const syncProfessorToAluno = async (
+    data: Partial<AppDataContextType>
+  ) => {
+    try {
+      console.log('🔄 Sincronizando dados do professor -> aluno');
+      if (data.teams) setTeams(data.teams);
+      if (data.players) setPlayers(data.players);
+      if (data.events) setEvents(data.events);
+    } catch (error) {
+      console.error('Erro ao sincronizar professor -> aluno:', error);
+    }
+  };
+
+  const syncAlunoToProfessor = async (
+    data: Partial<AppDataContextType>
+  ) => {
+    try {
+      console.log('🔄 Sincronizando dados do aluno -> professor');
+      // Aqui você poderia enviar os dados para o backend
+      // await apiService.syncAluno(data);
+    } catch (error) {
+      console.error('Erro ao sincronizar aluno -> professor:', error);
+    }
+  };
+  // FIM - FUNÇÕES DE SINCRONIZAÇÃO
+
   return (
     <AppDataContext.Provider value={{
       teams,
@@ -431,6 +460,8 @@ export function AppDataProvider({ children }: { children: ReactNode }) {
       getTodayEvents,
       getUpcomingEvents,
       getStats,
+      syncProfessorToAluno,
+      syncAlunoToProfessor,
     }}>
       {children}
     </AppDataContext.Provider>

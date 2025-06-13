@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import {
   View,
   Text,
@@ -6,8 +6,12 @@ import {
   ScrollView,
   SafeAreaView,
   TouchableOpacity,
+  Dimensions,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import ViewShot, { captureRef } from 'react-native-view-shot';
+import * as Sharing from 'expo-sharing';
+import { BarChart, PieChart } from 'react-native-chart-kit';
 import { useAuth } from '../../contexts/AuthContext';
 import { useNotifications } from '../../contexts/NotificationContext';
 import AsyncStorage from '@react-native-async-storage/async-storage';
@@ -40,11 +44,53 @@ export default function EstatisticasAtleta() {
     ultimosJogos: [],
   });
   const [periodoSelecionado, setPeriodoSelecionado] = useState('mes');
+  const viewShotRef = useRef<ViewShot>(null);
+  const screenWidth = Dimensions.get('window').width - 40;
+  const chartColors = ['#4CAF50', '#2196F3', '#FF9800', '#9C27B0', '#F44336'];
 
   useEffect(() => {
     loadEstatisticas();
     clearBadge('stats');
   }, []);
+
+  const periodTotals = calcularEstatisticasPeriodo(periodoSelecionado);
+
+  const calcularEstatisticasPeriodo = (periodo: string) => {
+    const agora = new Date();
+    const jogosFiltrados = stats.ultimosJogos.filter(jogo => {
+      const data = new Date(jogo.data);
+      if (periodo === 'mes') {
+        return data.getMonth() === agora.getMonth() && data.getFullYear() === agora.getFullYear();
+      }
+      if (periodo === 'temporada') {
+        return data.getFullYear() === agora.getFullYear();
+      }
+      return true; // carreira
+    });
+
+    return jogosFiltrados.reduce(
+      (totais, jogo) => {
+        totais.gols += jogo.stats.gols || 0;
+        totais.assistencias += jogo.stats.assistencias || 0;
+        totais.bloqueios += jogo.stats.bloqueios || 0;
+        const pos = (jogo as any).posicao || stats.posicao;
+        totais.desempenhoPorPosicao[pos] = (totais.desempenhoPorPosicao[pos] || 0) + 1;
+        return totais;
+      },
+      { gols: 0, assistencias: 0, bloqueios: 0, desempenhoPorPosicao: {} as Record<string, number> }
+    );
+  };
+
+  const compartilharDesempenho = async () => {
+    try {
+      const uri = await captureRef(viewShotRef);
+      if (uri) {
+        await Sharing.shareAsync(uri);
+      }
+    } catch (error) {
+      console.log('Erro ao compartilhar desempenho:', error);
+    }
+  };
 
   async function loadEstatisticas() {
     try {
@@ -128,7 +174,8 @@ export default function EstatisticasAtleta() {
 
   return (
     <SafeAreaView style={styles.container}>
-      <ScrollView showsVerticalScrollIndicator={false}>
+      <ViewShot ref={viewShotRef} style={{ flex: 1 }}>
+        <ScrollView showsVerticalScrollIndicator={false}>
         {/* Seletor de Período */}
         <View style={styles.periodSelector}>
           {periodos.map((periodo) => (
@@ -215,6 +262,49 @@ export default function EstatisticasAtleta() {
               <Ionicons name="trending-up" size={32} color="#ccc" />
               <Text style={styles.noDataText}>Aguardando registro de jogos</Text>
             </View>
+          )}
+        </View>
+
+        {/* Gráficos de Estatísticas */}
+        <View style={styles.chartSection}>
+          <Text style={styles.sectionTitle}>Resumo {periodos.find(p => p.value === periodoSelecionado)?.label}</Text>
+          <BarChart
+            data={{
+              labels: ['Gols', 'Assist.', 'Bloq.'],
+              datasets: [{ data: [periodTotals.gols, periodTotals.assistencias, periodTotals.bloqueios] }]
+            }}
+            width={screenWidth}
+            height={220}
+            fromZero
+            showValuesOnTopOfBars
+            chartConfig={{
+              backgroundColor: '#fff',
+              backgroundGradientFrom: '#fff',
+              backgroundGradientTo: '#fff',
+              decimalPlaces: 0,
+              color: (opacity = 1) => `rgba(76, 175, 80, ${opacity})`,
+              labelColor: (opacity = 1) => `rgba(0,0,0,${opacity})`,
+              propsForBackgroundLines: { stroke: '#e0e0e0' },
+            }}
+            style={{ borderRadius: 16 }}
+          />
+
+          {Object.keys(periodTotals.desempenhoPorPosicao).length > 0 && (
+            <PieChart
+              data={Object.entries(periodTotals.desempenhoPorPosicao).map(([pos, count], index) => ({
+                name: pos,
+                population: count,
+                color: chartColors[index % chartColors.length],
+                legendFontColor: '#333',
+                legendFontSize: 12,
+              }))}
+              width={screenWidth}
+              height={220}
+              accessor="population"
+              paddingLeft="15"
+              chartConfig={{ color: () => '#000' }}
+              style={{ marginTop: 20 }}
+            />
           )}
         </View>
 
@@ -312,7 +402,15 @@ export default function EstatisticasAtleta() {
             </View>
           </View>
         </View>
+
+        <View style={styles.shareContainer}>
+          <TouchableOpacity style={styles.shareButton} onPress={compartilharDesempenho}>
+            <Ionicons name="share-social" size={20} color="#fff" />
+            <Text style={styles.shareButtonText}>Compartilhar desempenho</Text>
+          </TouchableOpacity>
+        </View>
       </ScrollView>
+      </ViewShot>
     </SafeAreaView>
   );
 }
@@ -546,6 +644,30 @@ const styles = StyleSheet.create({
     height: '100%',
     backgroundColor: '#4CAF50',
     borderRadius: 4,
+  },
+  chartSection: {
+    marginHorizontal: 20,
+    marginBottom: 20,
+    backgroundColor: '#fff',
+    borderRadius: 12,
+    padding: 16,
+  },
+  shareContainer: {
+    alignItems: 'center',
+    marginBottom: 40,
+  },
+  shareButton: {
+    flexDirection: 'row',
+    backgroundColor: '#4CAF50',
+    paddingVertical: 12,
+    paddingHorizontal: 20,
+    borderRadius: 8,
+    alignItems: 'center',
+    gap: 8,
+  },
+  shareButtonText: {
+    color: '#fff',
+    fontWeight: 'bold',
   },
   noDataContainer: {
     flex: 1,
