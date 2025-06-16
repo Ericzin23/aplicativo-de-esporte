@@ -232,6 +232,8 @@ export default function Dashboard() {
   ];
 
   const getSportIcon = (sport: string) => {
+    if (!sport) return 'fitness';
+    
     switch (sport.toLowerCase()) {
       case 'futebol': return 'football';
       case 'volei': case 'vôlei': return 'basketball';
@@ -286,7 +288,7 @@ export default function Dashboard() {
           >
             {sports.map((sport) => (
               <TouchableOpacity
-                key={sport}
+                key={`sport-${sport}`}
                 style={[
                   styles.sportFilterButton,
                   selectedSport === sport && styles.sportFilterButtonActive
@@ -354,7 +356,7 @@ export default function Dashboard() {
         >
           {['Todos', ...teamsForFilter.map(t => t.name)].map(name => (
             <TouchableOpacity
-              key={name}
+              key={`team-${name}`}
               style={[
                 styles.sportFilterButton,
                 selectedTeam === name && styles.sportFilterButtonActive
@@ -381,7 +383,7 @@ export default function Dashboard() {
         >
           {['Todos', ...positionsForFilter].map(position => (
             <TouchableOpacity
-              key={position}
+              key={`position-${position}`}
               style={[
                 styles.sportFilterButton,
                 selectedPosition === position && styles.sportFilterButtonActive

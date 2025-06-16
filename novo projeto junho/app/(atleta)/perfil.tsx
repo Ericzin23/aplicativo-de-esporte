@@ -639,7 +639,10 @@ export default function PerfilAtleta() {
               <Ionicons name="basketball" size={20} color="#666" />
               <Text style={styles.infoLabel}>Esporte:</Text>
               <Text style={styles.infoValue}>
-                {playerInfo.esporte.charAt(0).toUpperCase() + playerInfo.esporte.slice(1).toLowerCase()}
+                {playerInfo.esporte ? 
+                  playerInfo.esporte.charAt(0).toUpperCase() + playerInfo.esporte.slice(1).toLowerCase() :
+                  'Não definido'
+                }
               </Text>
             </View>
           </View>

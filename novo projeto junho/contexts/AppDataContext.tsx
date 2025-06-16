@@ -218,6 +218,31 @@ const initialEvents: Event[] = [
   },
 ];
 
+// Função auxiliar para criar um novo jogador com valores padrão
+export function createNewPlayer(data: Partial<Player>): Player {
+  return {
+    id: data.id || '',
+    name: data.name || '',
+    position: data.position || '',
+    sport: data.sport || '',
+    teamId: data.teamId || '',
+    createdAt: data.createdAt || new Date().toISOString(),
+    updatedAt: data.updatedAt || new Date().toISOString(),
+    stats: {
+      goals: data.stats?.goals || 0,
+      assists: data.stats?.assists || 0,
+      games: data.stats?.games || 0,
+      cards: data.stats?.cards || 0,
+    },
+    profile: {
+      age: data.profile?.age || 0,
+      height: data.profile?.height,
+      weight: data.profile?.weight,
+      photo: data.profile?.photo,
+    },
+  };
+}
+
 export function AppDataProvider({ children }: { children: ReactNode }) {
   const [teams, setTeams] = useState<Team[]>([]);
   const [players, setPlayers] = useState<Player[]>([]);

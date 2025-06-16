@@ -120,7 +120,7 @@ export default function Times() {
     const teamPlayers = getPlayersByTeam(selectedTeam.id);
     const teamEvents = events.filter(event => 
       event.sport === selectedTeam.sport && 
-      event.title.toLowerCase().includes(selectedTeam.name.toLowerCase())
+      event.title?.toLowerCase().includes(selectedTeam.name?.toLowerCase() || '')
     );
     
     const totalGames = selectedTeam.wins + selectedTeam.losses + selectedTeam.draws;
@@ -150,7 +150,10 @@ export default function Times() {
                 <View>
                   <Text style={styles.teamModalName}>{selectedTeam.name}</Text>
                   <Text style={styles.teamModalSport}>
-                    {selectedTeam.sport.charAt(0).toUpperCase() + selectedTeam.sport.slice(1)}
+                    {selectedTeam.sport ? 
+                      selectedTeam.sport.charAt(0).toUpperCase() + selectedTeam.sport.slice(1).toLowerCase() :
+                      'Não definido'
+                    }
                   </Text>
                 </View>
               </View>
@@ -377,7 +380,10 @@ export default function Times() {
                           {teamPlayers.length} jogadores
                         </Text>
                         <Text style={styles.teamSport}>
-                          {team.sport.charAt(0).toUpperCase() + team.sport.slice(1)}
+                          {team.sport ? 
+                            team.sport.charAt(0).toUpperCase() + team.sport.slice(1).toLowerCase() :
+                            'Não definido'
+                          }
                         </Text>
                       </View>
                     </View>

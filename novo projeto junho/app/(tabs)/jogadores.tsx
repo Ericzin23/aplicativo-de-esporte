@@ -344,8 +344,8 @@ export default function JogadoresScreen() {
               const jogadorFeedbacks = feedbacks[jogador.id] || [];
               
               // Verifica se tem dados para mostrar
-              const temGols = jogador.stats.goals > 0;
-              const temAssistencias = jogador.stats.assists > 0;
+              const temGols = jogador.stats?.goals > 0;
+              const temAssistencias = jogador.stats?.assists > 0;
               const temFeedbacks = jogadorFeedbacks.length > 0;
               
               return (
@@ -521,6 +521,8 @@ export default function JogadoresScreen() {
 
 // Função auxiliar para obter o ícone do esporte
 function getSportIcon(sport: string): string {
+  if (!sport) return 'question';
+  
   switch (sport.toLowerCase()) {
     case 'futebol':
       return 'futbol';

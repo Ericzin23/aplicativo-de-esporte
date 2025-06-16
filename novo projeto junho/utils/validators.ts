@@ -34,6 +34,7 @@ export const validateCPF = (cpf: string): boolean => {
 };
 
 export const formatEmail = (email: string): string => {
+  if (!email) return '';
   return email.toLowerCase().trim();
 };
 
