@@ -18,12 +18,12 @@ import { useRouter, useSegments } from 'expo-router';
 SplashScreen.preventAutoHideAsync();
 
 function RootLayoutNav() {
-  const { user, isLoading } = useAuth();
+  const { user, isLoading: authLoading } = useAuth();
   const segments = useSegments();
   const router = useRouter();
 
   useEffect(() => {
-    if (isLoading) return;
+    if (authLoading) return;
 
     const inAuthGroup = segments[0] === '(tabs)' || segments[0] === '(atleta)';
     const inAuthPages = ['login', 'cadastro'].includes(segments[0]);
@@ -39,7 +39,15 @@ function RootLayoutNav() {
         router.replace('/(atleta)');
       }
     }
-  }, [user, segments, isLoading]);
+  }, [user, segments, authLoading]);
+
+  if (authLoading) {
+    return (
+      <View style={styles.container}>
+        <ActivityIndicator size="large" color="#0066FF" />
+      </View>
+    );
+  }
 
   return (
     <Stack screenOptions={{ headerShown: false }}>

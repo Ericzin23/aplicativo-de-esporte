@@ -1,9 +1,22 @@
 import React from 'react';
 import { Tabs } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
-import { Platform } from 'react-native';
+import { Platform, View, ActivityIndicator } from 'react-native';
+import { useAuth } from '../../contexts/AuthContext';
+import { useAppData } from '../../contexts/AppDataContext';
 
 export default function TabLayout() {
+  const { isLoading: authLoading } = useAuth();
+  const { isLoading: dataLoading } = useAppData();
+
+  if (authLoading || dataLoading) {
+    return (
+      <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
+        <ActivityIndicator size="large" color="#0066FF" />
+      </View>
+    );
+  }
+
   return (
     <Tabs
       screenOptions={{
@@ -66,6 +79,15 @@ export default function TabLayout() {
           title: 'Config',
           tabBarIcon: ({ color, size }) => (
             <Ionicons name="settings" size={size} color={color} />
+          ),
+        }}
+      />
+      <Tabs.Screen
+        name="relatorios"
+        options={{
+          title: 'Relatórios',
+          tabBarIcon: ({ color, size }) => (
+            <Ionicons name="bar-chart" size={size} color={color} />
           ),
         }}
       />

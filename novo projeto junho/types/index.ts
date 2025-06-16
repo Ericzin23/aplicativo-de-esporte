@@ -98,6 +98,7 @@ export type TabParamList = {
   jogadores: undefined;
   calendario: undefined;
   configuracoes: undefined;
+  relatorios: undefined;
 };
 
 // Tipos de formulário

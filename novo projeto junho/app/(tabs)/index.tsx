@@ -27,9 +27,9 @@ export default function Dashboard() {
     getTeamsBySport, 
     getPlayersBySport, 
     getEventsBySport,
-    teams,
-    players,
-    events
+    teams = [],
+    players = [],
+    events = []
   } = useAppData();
   
   const [showTeamModal, setShowTeamModal] = useState(false);
@@ -60,23 +60,23 @@ export default function Dashboard() {
   );
 
   // Função para obter dados filtrados por esporte
-  const getFilteredData = () => {
+  const filteredData = React.useMemo(() => {
     if (selectedSport === 'Todos') {
       return {
-        teams: teams,
-        players: players,
-        events: events,
-        todayEvents: getTodayEvents(),
-        upcomingEvents: getUpcomingEvents().slice(0, 3)
+        teams: teams || [],
+        players: players || [],
+        events: events || [],
+        todayEvents: getTodayEvents() || [],
+        upcomingEvents: (getUpcomingEvents() || []).slice(0, 3)
       };
     }
     
     const sportKey = selectedSport.toLowerCase();
-    const filteredTeams = getTeamsBySport(sportKey);
-    const filteredPlayers = getPlayersBySport(sportKey);
-    const filteredEvents = getEventsBySport(sportKey);
-    const todayEvents = getTodayEvents().filter(event => event.sport === sportKey);
-    const upcomingEvents = getUpcomingEvents()
+    const filteredTeams = getTeamsBySport(sportKey) || [];
+    const filteredPlayers = getPlayersBySport(sportKey) || [];
+    const filteredEvents = getEventsBySport(sportKey) || [];
+    const todayEvents = (getTodayEvents() || []).filter(event => event.sport === sportKey);
+    const upcomingEvents = (getUpcomingEvents() || [])
       .filter(event => event.sport === sportKey)
       .slice(0, 3);
 
@@ -87,13 +87,11 @@ export default function Dashboard() {
       todayEvents,
       upcomingEvents
     };
-  };
-
-  const filteredData = getFilteredData();
+  }, [selectedSport, teams, players, events, getTodayEvents, getUpcomingEvents, getTeamsBySport, getPlayersBySport, getEventsBySport]);
 
   const teamsForFilter = React.useMemo(
     () =>
-      filteredData.teams.map((t) => ({ id: t.id, name: t.name })),
+      (filteredData.teams || []).map((t) => ({ id: t.id, name: t.name })),
     [filteredData.teams]
   );
 
@@ -105,46 +103,43 @@ export default function Dashboard() {
     [selectedSport, allPositions]
   );
 
-  const filteredPlayers = filteredData.players.filter((p) => {
-    const matchesTeam = selectedTeam === 'Todos' || p.teamId === selectedTeam;
-    const matchesPosition =
-      selectedPosition === 'Todos' || p.position === selectedPosition;
-    return matchesTeam && matchesPosition;
-  });
+  const filteredPlayers = React.useMemo(() => 
+    (filteredData.players || []).filter((p) => {
+      const matchesTeam = selectedTeam === 'Todos' || p.teamId === selectedTeam;
+      const matchesPosition =
+        selectedPosition === 'Todos' || p.position === selectedPosition;
+      return matchesTeam && matchesPosition;
+    }),
+    [filteredData.players, selectedTeam, selectedPosition]
+  );
 
   // Estatísticas baseadas no esporte selecionado
-  const getFilteredStats = () => {
-    const todayGames = filteredData.todayEvents.filter(e => e.type === 'jogo').length;
-    const todayTrainings = filteredData.todayEvents.filter(e => e.type === 'treino').length;
-    
+  const stats = React.useMemo(() => {
+    const stats = getStats();
     return {
-      totalTeams: filteredData.teams.length,
-      totalPlayers: filteredData.players.length,
-      todayGames,
-      todayTrainings,
+      totalTeams: stats?.totalTeams || 0,
+      totalPlayers: stats?.totalPlayers || 0,
+      todayGames: stats?.todayGames || 0,
+      todayTrainings: stats?.todayTrainings || 0,
     };
-  };
+  }, [getStats]);
 
-  const stats = getFilteredStats();
-
-  const statsData = [
+  const statsData = React.useMemo(() => [
     { title: 'Times Ativos', value: stats.totalTeams.toString(), icon: 'people', color: '#4CAF50' },
     { title: 'Jogadores', value: stats.totalPlayers.toString(), icon: 'person', color: '#2196F3' },
     { title: 'Jogos Hoje', value: stats.todayGames.toString(), icon: 'football', color: '#FF9800' },
     { title: 'Treinos', value: stats.todayTrainings.toString(), icon: 'fitness', color: '#9C27B0' },
-  ];
+  ], [stats]);
 
   // Atividades recentes baseadas nos dados reais
   const getRecentActivities = () => {
     const activities = [];
     
     // Últimos jogadores adicionados
-    const recentPlayers = filteredData.players
-      .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
-      .slice(0, 2);
+    const recentPlayers = (filteredData.players || []).sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()).slice(0, 2);
     
     recentPlayers.forEach(player => {
-      const team = filteredData.teams.find(t => t.id === player.teamId);
+      const team = (filteredData.teams || []).find(t => t.id === player.teamId);
       activities.push({
         id: `player-${player.id}`,
         title: `Adicionou ${player.name}`,
@@ -155,9 +150,7 @@ export default function Dashboard() {
     });
 
     // Últimos times criados
-    const recentTeams = filteredData.teams
-      .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
-      .slice(0, 1);
+    const recentTeams = (filteredData.teams || []).sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()).slice(0, 1);
     
     recentTeams.forEach(team => {
       activities.push({
@@ -170,7 +163,7 @@ export default function Dashboard() {
     });
 
     // Próximos eventos
-    const upcomingEvents = filteredData.upcomingEvents.slice(0, 1);
+    const upcomingEvents = (filteredData.upcomingEvents || []).slice(0, 1);
     upcomingEvents.forEach(event => {
       activities.push({
         id: `event-${event.id}`,

@@ -51,6 +51,29 @@ interface Feedback {
   professor: string;
 }
 
+// Interface para jogador
+interface Jogador {
+  id: string;
+  name: string;
+  position: string;
+  sport: string;
+  teamId: string;
+  createdAt: string;
+  updatedAt: string;
+  stats: {
+    goals: number;
+    assists: number;
+    games: number;
+    cards: number;
+  };
+  profile: {
+    age: number;
+    height?: string;
+    weight?: string;
+    photo?: string;
+  };
+}
+
 export default function JogadoresScreen() {
   const theme = useTheme();
   const { players, teams, updatePlayer } = useAppData();
@@ -64,6 +87,31 @@ export default function JogadoresScreen() {
   const [feedbacks, setFeedbacks] = useState<Record<string, Feedback[]>>({});
   const [menuVisible, setMenuVisible] = useState(false);
   const scrollY = new Animated.Value(0);
+
+  // Limpar dados fictícios ao iniciar
+  React.useEffect(() => {
+    const limparDadosFicticios = async () => {
+      try {
+        // Limpar jogadores
+        await AsyncStorage.setItem('@GestaoTimes:players', JSON.stringify([]));
+        
+        // Limpar feedbacks
+        await AsyncStorage.setItem('feedbacks', JSON.stringify({}));
+        
+        // Limpar times
+        await AsyncStorage.setItem('@GestaoTimes:teams', JSON.stringify([]));
+        
+        // Limpar eventos
+        await AsyncStorage.setItem('@GestaoTimes:events', JSON.stringify([]));
+        
+        console.log('✅ Dados fictícios removidos com sucesso');
+      } catch (error) {
+        console.error('❌ Erro ao limpar dados fictícios:', error);
+      }
+    };
+
+    limparDadosFicticios();
+  }, []);
 
   // Carregar feedbacks do storage
   React.useEffect(() => {
@@ -82,10 +130,19 @@ export default function JogadoresScreen() {
 
   // Lista de times para filtro
   const times = useMemo(() => {
-    return teams.map(team => team.name);
+    // Criar um objeto com IDs únicos
+    const uniqueTeams = teams.reduce((acc, team) => {
+      if (!acc[team.id]) {
+        acc[team.id] = team;
+      }
+      return acc;
+    }, {} as Record<string, typeof teams[0]>);
+
+    // Converter para array
+    return Object.values(uniqueTeams);
   }, [teams]);
 
-  // Filtra jogadores por nome, time, esporte e posição
+  // Lista de jogadores filtrados
   const jogadoresFiltrados = useMemo(() => {
     return players.filter(jogador => {
       const matchBusca = jogador.name.toLowerCase().includes(busca.toLowerCase());
@@ -219,23 +276,25 @@ export default function JogadoresScreen() {
         {/* Conteúdo Principal */}
         <View style={styles.mainContent}>
           {/* Barra de Busca */}
-          <Surface style={styles.searchSurface} elevation={4}>
-            <View style={styles.searchContainer}>
-              <Ionicons name="search" size={20} color="#666" style={styles.searchIcon} />
-              <TextInput
-                style={styles.busca}
-                placeholder="Buscar jogador..."
-                placeholderTextColor="#999"
-                value={busca}
-                onChangeText={setBusca}
-              />
-              {busca.length > 0 && (
-                <TouchableOpacity onPress={() => setBusca('')}>
-                  <Ionicons name="close-circle" size={20} color="#666" />
-                </TouchableOpacity>
-              )}
-            </View>
-          </Surface>
+          <View style={styles.searchWrapper}>
+            <Surface style={styles.searchSurface} elevation={4}>
+              <View style={styles.searchContainer}>
+                <Ionicons name="search" size={20} color="#666" style={styles.searchIcon} />
+                <TextInput
+                  style={styles.busca}
+                  placeholder="Buscar jogador..."
+                  placeholderTextColor="#999"
+                  value={busca}
+                  onChangeText={setBusca}
+                />
+                {busca.length > 0 && (
+                  <TouchableOpacity onPress={() => setBusca('')}>
+                    <Ionicons name="close-circle" size={20} color="#666" />
+                  </TouchableOpacity>
+                )}
+              </View>
+            </Surface>
+          </View>
           
           {/* Filtros */}
           <View style={styles.filtrosWrapper}>
@@ -246,6 +305,7 @@ export default function JogadoresScreen() {
               contentContainerStyle={styles.filtrosContent}
             >
               <Chip
+                key="filter-all-teams"
                 selected={!timeFiltro}
                 onPress={() => setTimeFiltro('')}
                 style={[styles.filtroChip, !timeFiltro && styles.filtroChipSelected]}
@@ -257,14 +317,14 @@ export default function JogadoresScreen() {
               
               {times.map(time => (
                 <Chip
-                  key={time}
-                  selected={timeFiltro === time}
-                  onPress={() => setTimeFiltro(time)}
-                  style={[styles.filtroChip, timeFiltro === time && styles.filtroChipSelected]}
+                  key={time.id}
+                  selected={timeFiltro === time.id}
+                  onPress={() => setTimeFiltro(time.id)}
+                  style={[styles.filtroChip, timeFiltro === time.id && styles.filtroChipSelected]}
                   mode="outlined"
                   icon="tshirt-crew"
                 >
-                  {time}
+                  {time.name}
                 </Chip>
               ))}
             </ScrollView>
@@ -283,6 +343,11 @@ export default function JogadoresScreen() {
               const team = teams.find(t => t.id === jogador.teamId);
               const jogadorFeedbacks = feedbacks[jogador.id] || [];
               
+              // Verifica se tem dados para mostrar
+              const temGols = jogador.stats.goals > 0;
+              const temAssistencias = jogador.stats.assists > 0;
+              const temFeedbacks = jogadorFeedbacks.length > 0;
+              
               return (
                 <Card 
                   key={jogador.id} 
@@ -294,7 +359,6 @@ export default function JogadoresScreen() {
                 >
                   <LinearGradient
                     colors={['#fff', '#f8f9fa']}
-                    style={styles.cardGradient}
                   >
                     <Card.Content style={styles.cardContent}>
                       <View style={styles.jogadorInfo}>
@@ -323,25 +387,40 @@ export default function JogadoresScreen() {
                         </View>
                       </View>
                       
-                      <View style={styles.statsContainer}>
-                        <View style={styles.statItem}>
-                          <MaterialCommunityIcons name="goal" size={20} color="#0066FF" />
-                          <Text style={styles.statValue}>{jogador.goals}</Text>
-                          <Text style={styles.statLabel}>Gols</Text>
+                      {/* Estatísticas - Só mostra se tiver dados */}
+                      {(temGols || temAssistencias || temFeedbacks) && (
+                        <View style={styles.statsContainer}>
+                          {temGols && (
+                            <>
+                              <View style={styles.statItem}>
+                                <MaterialCommunityIcons name="soccer" size={20} color="#0066FF" />
+                                <Text style={styles.statValue}>{jogador.stats.goals}</Text>
+                                <Text style={styles.statLabel}>Gols</Text>
+                              </View>
+                              {(temAssistencias || temFeedbacks) && <View style={styles.statDivider} />}
+                            </>
+                          )}
+                          
+                          {temAssistencias && (
+                            <>
+                              <View style={styles.statItem}>
+                                <MaterialCommunityIcons name="handshake" size={20} color="#0066FF" />
+                                <Text style={styles.statValue}>{jogador.stats.assists}</Text>
+                                <Text style={styles.statLabel}>Assist.</Text>
+                              </View>
+                              {temFeedbacks && <View style={styles.statDivider} />}
+                            </>
+                          )}
+                          
+                          {temFeedbacks && (
+                            <View style={styles.statItem}>
+                              <MaterialCommunityIcons name="message-text" size={20} color="#0066FF" />
+                              <Text style={styles.statValue}>{jogadorFeedbacks.length}</Text>
+                              <Text style={styles.statLabel}>Feedbacks</Text>
+                            </View>
+                          )}
                         </View>
-                        <View style={styles.statDivider} />
-                        <View style={styles.statItem}>
-                          <MaterialCommunityIcons name="handshake" size={20} color="#0066FF" />
-                          <Text style={styles.statValue}>{jogador.assists}</Text>
-                          <Text style={styles.statLabel}>Assist.</Text>
-                        </View>
-                        <View style={styles.statDivider} />
-                        <View style={styles.statItem}>
-                          <MaterialCommunityIcons name="message-text" size={20} color="#0066FF" />
-                          <Text style={styles.statValue}>{jogadorFeedbacks.length}</Text>
-                          <Text style={styles.statLabel}>Feedbacks</Text>
-                        </View>
-                      </View>
+                      )}
                     </Card.Content>
                   </LinearGradient>
                 </Card>
@@ -500,9 +579,11 @@ const styles = StyleSheet.create({
     flex: 1,
     marginTop: 100,
   },
-  searchSurface: {
+  searchWrapper: {
     marginHorizontal: 12,
     marginBottom: 8,
+  },
+  searchSurface: {
     borderRadius: 8,
     backgroundColor: '#fff',
   },
@@ -510,6 +591,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     paddingHorizontal: 8,
+    paddingVertical: 8,
   },
   searchIcon: {
     marginRight: 4,

@@ -1,6 +1,10 @@
-import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
+import React, { createContext, useContext, useState, useEffect, ReactNode, useCallback } from 'react';
 import { getItem, setItem, StorageKeys } from '../utils/storage';
 import { useNotifications } from './NotificationContext';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import 'react-native-get-random-values';
+import { v4 as uuid } from 'uuid';
+import { View, ActivityIndicator } from 'react-native';
 
 interface Team {
   id: string;
@@ -16,13 +20,23 @@ interface Team {
 interface Player {
   id: string;
   name: string;
-  sport: string;
   position: string;
+  sport: string;
   teamId: string;
-  goals: number;
-  assists: number;
-  age: number;
   createdAt: string;
+  updatedAt: string;
+  stats: {
+    goals: number;
+    assists: number;
+    games: number;
+    cards: number;
+  };
+  profile: {
+    age: number;
+    height?: string;
+    weight?: string;
+    photo?: string;
+  };
 }
 
 interface Event {
@@ -50,7 +64,7 @@ interface AppDataContextType {
   players: Player[];
   events: Event[];
   addTeam: (team: Omit<Team, 'id' | 'createdAt'>) => Promise<void>;
-  addPlayer: (player: Omit<Player, 'id' | 'createdAt'>) => Promise<void>;
+  addPlayer: (player: Omit<Player, 'id'>) => Promise<void>;
   addEvent: (event: Omit<Event, 'id' | 'createdAt'>) => Promise<void>;
   addGuidance: (playerId: string, guidance: Omit<Guidance, 'id'>) => Promise<void>;
   addPlayerStats: (playerId: string, stats: Record<string, number>) => Promise<void>;
@@ -122,6 +136,16 @@ const initialPlayers: Player[] = [
     assists: 2,
     age: 25,
     createdAt: new Date().toISOString(),
+    updatedAt: new Date().toISOString(),
+    stats: {
+      goals: 0,
+      assists: 2,
+      games: 0,
+      cards: 0,
+    },
+    profile: {
+      age: 25,
+    },
   },
   {
     id: '2',
@@ -133,6 +157,16 @@ const initialPlayers: Player[] = [
     assists: 3,
     age: 23,
     createdAt: new Date().toISOString(),
+    updatedAt: new Date().toISOString(),
+    stats: {
+      goals: 8,
+      assists: 3,
+      games: 0,
+      cards: 0,
+    },
+    profile: {
+      age: 23,
+    },
   },
   {
     id: '3',
@@ -144,6 +178,16 @@ const initialPlayers: Player[] = [
     assists: 15,
     age: 22,
     createdAt: new Date().toISOString(),
+    updatedAt: new Date().toISOString(),
+    stats: {
+      goals: 0,
+      assists: 15,
+      games: 0,
+      cards: 0,
+    },
+    profile: {
+      age: 22,
+    },
   },
 ];
 
@@ -187,282 +231,223 @@ export function AppDataProvider({ children }: { children: ReactNode }) {
   const [teams, setTeams] = useState<Team[]>([]);
   const [players, setPlayers] = useState<Player[]>([]);
   const [events, setEvents] = useState<Event[]>([]);
-  const { notifyEvent, notifyStats, notifyGuidance } = useNotifications();
+  const [isLoading, setIsLoading] = useState(true);
+  const { notifyEvent, notifyStats, notifyGuidance, showNotification } = useNotifications();
 
-  // Carregar dados do storage
+  // Carregar dados do AsyncStorage
   useEffect(() => {
+    const loadData = async () => {
+      try {
+        const storedTeams = await AsyncStorage.getItem('@GestaoTimes:teams');
+        const storedPlayers = await AsyncStorage.getItem('@GestaoTimes:players');
+        const storedEvents = await AsyncStorage.getItem('@GestaoTimes:events');
+
+        if (storedTeams) setTeams(JSON.parse(storedTeams));
+        if (storedPlayers) setPlayers(JSON.parse(storedPlayers));
+        if (storedEvents) setEvents(JSON.parse(storedEvents));
+      } catch (error) {
+        console.error('Erro ao carregar dados:', error);
+        setTeams([]);
+        setPlayers([]);
+        setEvents([]);
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
     loadData();
   }, []);
 
-  const loadData = async () => {
+  // Funções de adição
+  const addTeam = useCallback(async (team: Omit<Team, 'id' | 'createdAt'>) => {
     try {
-      console.log('🔄 Carregando dados do storage...');
-      const storedTeams = await getItem<Team[]>(StorageKeys.TEAMS);
-      const storedPlayers = await getItem<Player[]>(StorageKeys.PLAYERS);
-      const storedEvents = await getItem<Event[]>(StorageKeys.EVENTS);
-      
-      console.log('📦 Dados do storage:', { storedTeams, storedPlayers, storedEvents });
-      
-      // Se não há dados salvos, usar dados iniciais
-      if (!storedTeams || storedTeams.length === 0) {
-        console.log('🆕 Usando dados iniciais para teams');
-        setTeams(initialTeams);
-        await setItem(StorageKeys.TEAMS, initialTeams);
-      } else {
-        console.log('✅ Carregando teams do storage:', storedTeams.length, 'times');
-        // Migrar dados antigos sem esporte
-        const migratedTeams = storedTeams.map(team => ({
-          ...team,
-          sport: team.sport || 'futebol'
-        }));
-        setTeams(migratedTeams);
-        if (migratedTeams.some(team => !team.sport)) {
-          await setItem(StorageKeys.TEAMS, migratedTeams);
-        }
-      }
+      const newTeam: Team = {
+        ...team,
+        id: uuid(),
+        createdAt: new Date().toISOString(),
+      };
 
-      if (!storedPlayers || storedPlayers.length === 0) {
-        console.log('🆕 Usando dados iniciais para players');
-        setPlayers(initialPlayers);
-        await setItem(StorageKeys.PLAYERS, initialPlayers);
-      } else {
-        console.log('✅ Carregando players do storage:', storedPlayers.length, 'jogadores');
-        // Migrar dados antigos sem esporte
-        const migratedPlayers = storedPlayers.map(player => ({
-          ...player,
-          sport: player.sport || 'futebol'
-        }));
-        setPlayers(migratedPlayers);
-        if (migratedPlayers.some(player => !player.sport)) {
-          await setItem(StorageKeys.PLAYERS, migratedPlayers);
-        }
-      }
-
-      if (!storedEvents || storedEvents.length === 0) {
-        console.log('🆕 Usando dados iniciais para events');
-        setEvents(initialEvents);
-        await setItem(StorageKeys.EVENTS, initialEvents);
-      } else {
-        console.log('✅ Carregando events do storage:', storedEvents.length, 'eventos');
-        // Migrar dados antigos sem esporte
-        const migratedEvents = storedEvents.map(event => ({
-          ...event,
-          sport: event.sport || 'futebol'
-        }));
-        setEvents(migratedEvents);
-        if (migratedEvents.some(event => !event.sport)) {
-          await setItem(StorageKeys.EVENTS, migratedEvents);
-        }
-      }
+      const updatedTeams = [...teams, newTeam];
+      setTeams(updatedTeams);
+      await AsyncStorage.setItem('@GestaoTimes:teams', JSON.stringify(updatedTeams));
+      showNotification('Time adicionado com sucesso!');
     } catch (error) {
-      console.error('❌ Erro ao carregar dados:', error);
-      // Em caso de erro, usar dados iniciais
-      setTeams(initialTeams);
-      setPlayers(initialPlayers);
-      setEvents(initialEvents);
+      console.error('Erro ao adicionar time:', error);
+      showNotification('Erro ao adicionar time', 'error');
     }
-  };
+  }, [teams, showNotification]);
 
-  const saveTeams = async (newTeams: Team[]) => {
+  const addPlayer = useCallback(async (player: Omit<Player, 'id'>) => {
     try {
-      await setItem(StorageKeys.TEAMS, newTeams);
-      setTeams(newTeams);
-    } catch (error) {
-      console.error('Erro ao salvar times:', error);
-    }
-  };
+      const newPlayer: Player = {
+        ...player,
+        id: uuid(),
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+        stats: {
+          goals: 0,
+          assists: 0,
+          games: 0,
+          cards: 0,
+        },
+        profile: {
+          age: player.profile?.age || 0,
+        },
+      };
 
-  const savePlayers = async (newPlayers: Player[]) => {
+      const updatedPlayers = [...players, newPlayer];
+      setPlayers(updatedPlayers);
+      await AsyncStorage.setItem('@GestaoTimes:players', JSON.stringify(updatedPlayers));
+      showNotification('Jogador adicionado com sucesso!');
+    } catch (error) {
+      console.error('Erro ao adicionar jogador:', error);
+      showNotification('Erro ao adicionar jogador', 'error');
+    }
+  }, [players, showNotification]);
+
+  const addEvent = useCallback(async (event: Omit<Event, 'id' | 'createdAt'>) => {
     try {
-      await setItem(StorageKeys.PLAYERS, newPlayers);
-      setPlayers(newPlayers);
-    } catch (error) {
-      console.error('Erro ao salvar jogadores:', error);
-    }
-  };
+      const newEvent: Event = {
+        ...event,
+        id: uuid(),
+        createdAt: new Date().toISOString(),
+      };
 
-  const saveEvents = async (newEvents: Event[]) => {
+      const updatedEvents = [...events, newEvent];
+      setEvents(updatedEvents);
+      await AsyncStorage.setItem('@GestaoTimes:events', JSON.stringify(updatedEvents));
+      notifyEvent(newEvent);
+      showNotification('Evento adicionado com sucesso!');
+    } catch (error) {
+      console.error('Erro ao adicionar evento:', error);
+      showNotification('Erro ao adicionar evento', 'error');
+    }
+  }, [events, notifyEvent, showNotification]);
+
+  // Funções de atualização
+  const updateTeam = useCallback(async (id: string, team: Partial<Team>) => {
     try {
-      await setItem(StorageKeys.EVENTS, newEvents);
-      setEvents(newEvents);
+      const updatedTeams = teams.map(t => t.id === id ? { ...t, ...team } : t);
+      setTeams(updatedTeams);
+      await AsyncStorage.setItem('@GestaoTimes:teams', JSON.stringify(updatedTeams));
+      showNotification('Time atualizado com sucesso!');
     } catch (error) {
-      console.error('Erro ao salvar eventos:', error);
+      console.error('Erro ao atualizar time:', error);
+      showNotification('Erro ao atualizar time', 'error');
     }
-  };
+  }, [teams, showNotification]);
 
-  const addTeam = async (teamData: Omit<Team, 'id' | 'createdAt'>) => {
-    const newTeam: Team = {
-      ...teamData,
-      id: Date.now().toString(),
-      createdAt: new Date().toISOString(),
-    };
-    const newTeams = [...teams, newTeam];
-    await saveTeams(newTeams);
-  };
+  const updatePlayer = useCallback(async (id: string, player: Partial<Player>) => {
+    try {
+      const updatedPlayers = players.map(p => p.id === id ? { ...p, ...player, updatedAt: new Date().toISOString() } : p);
+      setPlayers(updatedPlayers);
+      await AsyncStorage.setItem('@GestaoTimes:players', JSON.stringify(updatedPlayers));
+      showNotification('Jogador atualizado com sucesso!');
+    } catch (error) {
+      console.error('Erro ao atualizar jogador:', error);
+      showNotification('Erro ao atualizar jogador', 'error');
+    }
+  }, [players, showNotification]);
 
-  const addPlayer = async (playerData: Omit<Player, 'id' | 'createdAt'>) => {
-    const newPlayer: Player = {
-      ...playerData,
-      id: Date.now().toString(),
-      createdAt: new Date().toISOString(),
-    };
-    const newPlayers = [...players, newPlayer];
-    await savePlayers(newPlayers);
-  };
+  // Funções de remoção
+  const deleteTeam = useCallback(async (id: string) => {
+    try {
+      const updatedTeams = teams.filter(t => t.id !== id);
+      setTeams(updatedTeams);
+      await AsyncStorage.setItem('@GestaoTimes:teams', JSON.stringify(updatedTeams));
+      showNotification('Time removido com sucesso!');
+    } catch (error) {
+      console.error('Erro ao remover time:', error);
+      showNotification('Erro ao remover time', 'error');
+    }
+  }, [teams, showNotification]);
 
-  const addEvent = async (eventData: Omit<Event, 'id' | 'createdAt'>) => {
-    const newEvent: Event = {
-      ...eventData,
-      id: Date.now().toString(),
-      createdAt: new Date().toISOString(),
-    };
-    const newEvents = [...events, newEvent];
-    await saveEvents(newEvents);
-    await notifyEvent('Novo evento', `${newEvent.title} em ${newEvent.date}`);
-  };
+  const deletePlayer = useCallback(async (id: string) => {
+    try {
+      const updatedPlayers = players.filter(p => p.id !== id);
+      setPlayers(updatedPlayers);
+      await AsyncStorage.setItem('@GestaoTimes:players', JSON.stringify(updatedPlayers));
+      showNotification('Jogador removido com sucesso!');
+    } catch (error) {
+      console.error('Erro ao remover jogador:', error);
+      showNotification('Erro ao remover jogador', 'error');
+    }
+  }, [players, showNotification]);
 
-  const addGuidance = async (
-    playerId: string,
-    guidanceData: Omit<Guidance, 'id'>
-  ) => {
-    const storageKey = `@GestaoTimes:guidance_${playerId}`;
-    const stored = await getItem<Guidance[]>(storageKey);
-    const newGuidance: Guidance = { ...guidanceData, id: Date.now().toString() };
-    const list = stored ? [...stored, newGuidance] : [newGuidance];
-    await setItem(storageKey, list);
-    await notifyGuidance('Nova orientação', newGuidance.titulo);
-  };
-
-  const addPlayerStats = async (
-    playerId: string,
-    stats: Record<string, number>
-  ) => {
-    const storageKey = `@GestaoTimes:player_stats_${playerId}`;
-    const stored = await getItem<Record<string, number>>(storageKey);
-    const updated = { ...(stored || {}), ...stats };
-    await setItem(storageKey, updated);
-    await notifyStats('Estatísticas atualizadas', 'Confira suas novas estatísticas');
-  };
-
-  const updateTeam = async (id: string, teamData: Partial<Team>) => {
-    const newTeams = teams.map(team => 
-      team.id === id ? { ...team, ...teamData } : team
-    );
-    await saveTeams(newTeams);
-  };
-
-  const updatePlayer = async (id: string, playerData: Partial<Player>) => {
-    const newPlayers = players.map(player => 
-      player.id === id ? { ...player, ...playerData } : player
-    );
-    await savePlayers(newPlayers);
-  };
-
-  const deleteTeam = async (id: string) => {
-    const newTeams = teams.filter(team => team.id !== id);
-    await saveTeams(newTeams);
-  };
-
-  const deletePlayer = async (id: string) => {
-    const newPlayers = players.filter(player => player.id !== id);
-    await savePlayers(newPlayers);
-  };
-
-  const getPlayersByTeam = (teamId: string) => {
+  // Funções de utilidade
+  const getPlayersByTeam = useCallback((teamId: string) => {
     return players.filter(player => player.teamId === teamId);
-  };
+  }, [players]);
 
-  const getPlayersByPosition = (position: string) => {
+  const getPlayersByPosition = useCallback((position: string) => {
     return players.filter(player => player.position === position);
-  };
+  }, [players]);
 
-  const getPlayersBySport = (sport: string) => {
+  const getPlayersBySport = useCallback((sport: string) => {
     return players.filter(player => player.sport === sport);
-  };
+  }, [players]);
 
-  const getTeamsBySport = (sport: string) => {
+  const getTeamsBySport = useCallback((sport: string) => {
     return teams.filter(team => team.sport === sport);
-  };
+  }, [teams]);
 
-  const getEventsBySport = (sport: string) => {
+  const getEventsBySport = useCallback((sport: string) => {
     return events.filter(event => event.sport === sport);
-  };
+  }, [events]);
 
-  const getTodayEvents = () => {
+  const getTodayEvents = useCallback(() => {
     const today = new Date().toISOString().split('T')[0];
     return events.filter(event => event.date === today);
-  };
+  }, [events]);
 
-  const getUpcomingEvents = () => {
-    const today = new Date();
-    return events.filter(event => {
-      const eventDate = new Date(event.date);
-      return eventDate >= today;
-    }).sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
-  };
+  const getUpcomingEvents = useCallback(() => {
+    const today = new Date().toISOString().split('T')[0];
+    return events.filter(event => event.date > today);
+  }, [events]);
 
-  const getStats = () => {
-    const todayEvents = getTodayEvents();
+  const getStats = useCallback(() => {
+    const today = new Date().toISOString().split('T')[0];
+    const todayEvents = events.filter(event => event.date === today);
+    
     return {
       totalTeams: teams.length,
       totalPlayers: players.length,
-      todayGames: todayEvents.filter(e => e.type === 'jogo').length,
-      todayTrainings: todayEvents.filter(e => e.type === 'treino').length,
+      todayGames: todayEvents.filter(event => event.type === 'jogo').length,
+      todayTrainings: todayEvents.filter(event => event.type === 'treino').length
     };
+  }, [teams, players, events]);
+
+  const value = {
+    teams,
+    players,
+    events,
+    addTeam,
+    addPlayer,
+    addEvent,
+    updateTeam,
+    updatePlayer,
+    deleteTeam,
+    deletePlayer,
+    getPlayersByTeam,
+    getPlayersByPosition,
+    getPlayersBySport,
+    getTeamsBySport,
+    getEventsBySport,
+    getTodayEvents,
+    getUpcomingEvents,
+    getStats
   };
 
-  // INÍCIO - FUNÇÕES DE SINCRONIZAÇÃO
-  const syncProfessorToAluno = async (
-    data: Partial<AppDataContextType>
-  ) => {
-    try {
-      console.log('🔄 Sincronizando dados do professor -> aluno');
-      if (data.teams) setTeams(data.teams);
-      if (data.players) setPlayers(data.players);
-      if (data.events) setEvents(data.events);
-    } catch (error) {
-      console.error('Erro ao sincronizar professor -> aluno:', error);
-    }
-  };
-
-  const syncAlunoToProfessor = async (
-    data: Partial<AppDataContextType>
-  ) => {
-    try {
-      console.log('🔄 Sincronizando dados do aluno -> professor');
-      // Aqui você poderia enviar os dados para o backend
-      // await apiService.syncAluno(data);
-    } catch (error) {
-      console.error('Erro ao sincronizar aluno -> professor:', error);
-    }
-  };
-  // FIM - FUNÇÕES DE SINCRONIZAÇÃO
+  if (isLoading) {
+    return (
+      <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
+        <ActivityIndicator size="large" color="#0066FF" />
+      </View>
+    );
+  }
 
   return (
-    <AppDataContext.Provider value={{
-      teams,
-      players,
-      events,
-      addTeam,
-      addPlayer,
-      addEvent,
-      addGuidance,
-      addPlayerStats,
-      updateTeam,
-      updatePlayer,
-      deleteTeam,
-      deletePlayer,
-      getPlayersByTeam,
-      getPlayersByPosition,
-      getPlayersBySport,
-      getTeamsBySport,
-      getEventsBySport,
-      getTodayEvents,
-      getUpcomingEvents,
-      getStats,
-      syncProfessorToAluno,
-      syncAlunoToProfessor,
-    }}>
+    <AppDataContext.Provider value={value}>
       {children}
     </AppDataContext.Provider>
   );

@@ -23,6 +23,19 @@ interface Player {
   assists: number;
   age: number;
   createdAt: string;
+  updatedAt: string;
+  stats: {
+    goals: number;
+    assists: number;
+    games: number;
+    cards: number;
+  };
+  profile: {
+    age: number;
+    height?: number;
+    weight?: number;
+    photo?: string;
+  };
 }
 
 interface AddPlayerModalProps {
@@ -104,9 +117,20 @@ export function AddPlayerModal({ visible, onClose, editingPlayer }: AddPlayerMod
         sport,
         position,
         teamId,
-        age: Number(age),
-        goals: editingPlayer?.goals || 0,
-        assists: editingPlayer?.assists || 0,
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+        stats: {
+          goals: editingPlayer?.stats?.goals || 0,
+          assists: editingPlayer?.stats?.assists || 0,
+          games: editingPlayer?.stats?.games || 0,
+          cards: editingPlayer?.stats?.cards || 0
+        },
+        profile: {
+          age: Number(age),
+          height: editingPlayer?.profile?.height,
+          weight: editingPlayer?.profile?.weight,
+          photo: editingPlayer?.profile?.photo
+        }
       };
 
       if (editingPlayer) {
@@ -291,11 +315,11 @@ export function AddPlayerModal({ visible, onClose, editingPlayer }: AddPlayerMod
                 <Text style={styles.statsTitle}>📊 Estatísticas</Text>
                 <View style={styles.statsRow}>
                   <View style={styles.statItem}>
-                    <Text style={styles.statNumber}>{editingPlayer.goals}</Text>
+                    <Text style={styles.statNumber}>{editingPlayer.stats.goals}</Text>
                     <Text style={styles.statLabel}>Gols</Text>
                   </View>
                   <View style={styles.statItem}>
-                    <Text style={styles.statNumber}>{editingPlayer.assists}</Text>
+                    <Text style={styles.statNumber}>{editingPlayer.stats.assists}</Text>
                     <Text style={styles.statLabel}>Assistências</Text>
                   </View>
                 </View>

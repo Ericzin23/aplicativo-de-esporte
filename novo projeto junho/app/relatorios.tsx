@@ -14,22 +14,22 @@ import { useAppData } from '../contexts/AppDataContext';
 
 export default function Relatorios() {
   const router = useRouter();
-  const { teams, players, events } = useAppData();
+  const { teams = [], players = [], events = [] } = useAppData();
 
   // Calcular estatísticas
-  const totalGols = players.reduce((sum, player) => sum + player.goals, 0);
-  const totalAssistencias = players.reduce((sum, player) => sum + player.assists, 0);
+  const totalGols = players.reduce((sum, player) => sum + (player.stats?.goals || 0), 0);
+  const totalAssistencias = players.reduce((sum, player) => sum + (player.stats?.assists || 0), 0);
   
   // Top artilheiros
   const topScorers = players
-    .filter(player => player.goals > 0)
-    .sort((a, b) => b.goals - a.goals)
+    .filter(player => (player.stats?.goals || 0) > 0)
+    .sort((a, b) => (b.stats?.goals || 0) - (a.stats?.goals || 0))
     .slice(0, 5);
 
   // Top assistentes
   const topAssisters = players
-    .filter(player => player.assists > 0)
-    .sort((a, b) => b.assists - a.assists)
+    .filter(player => (player.stats?.assists || 0) > 0)
+    .sort((a, b) => (b.stats?.assists || 0) - (a.stats?.assists || 0))
     .slice(0, 5);
 
   // Estatísticas por posição
@@ -38,8 +38,8 @@ export default function Relatorios() {
       acc[player.position] = { count: 0, goals: 0, assists: 0 };
     }
     acc[player.position].count++;
-    acc[player.position].goals += player.goals;
-    acc[player.position].assists += player.assists;
+    acc[player.position].goals += player.stats?.goals || 0;
+    acc[player.position].assists += player.stats?.assists || 0;
     return acc;
   }, {} as Record<string, { count: number; goals: number; assists: number }>);
 
@@ -114,7 +114,7 @@ export default function Relatorios() {
                     <Text style={styles.teamName}>{getTeamName(player.teamId)}</Text>
                   </View>
                   <View style={styles.statBadge}>
-                    <Text style={styles.statBadgeText}>{player.goals} gols</Text>
+                    <Text style={styles.statBadgeText}>{player.stats?.goals || 0} gols</Text>
                   </View>
                 </View>
               ))
@@ -139,7 +139,7 @@ export default function Relatorios() {
                     <Text style={styles.teamName}>{getTeamName(player.teamId)}</Text>
                   </View>
                   <View style={styles.statBadge}>
-                    <Text style={styles.statBadgeText}>{player.assists} assist.</Text>
+                    <Text style={styles.statBadgeText}>{player.stats?.assists || 0} assist.</Text>
                   </View>
                 </View>
               ))
@@ -195,8 +195,8 @@ export default function Relatorios() {
             {teams.length > 0 ? (
               teams.map((team) => {
                 const teamPlayers = players.filter(p => p.teamId === team.id);
-                const teamGoals = teamPlayers.reduce((sum, p) => sum + p.goals, 0);
-                const teamAssists = teamPlayers.reduce((sum, p) => sum + p.assists, 0);
+                const teamGoals = teamPlayers.reduce((sum, p) => sum + (p.stats?.goals || 0), 0);
+                const teamAssists = teamPlayers.reduce((sum, p) => sum + (p.stats?.assists || 0), 0);
                 
                 return (
                   <View key={team.id} style={styles.teamCard}>
