@@ -132,9 +132,6 @@ const initialPlayers: Player[] = [
     sport: 'futebol',
     position: 'Goleiro',
     teamId: '1',
-    goals: 0,
-    assists: 2,
-    age: 25,
     createdAt: new Date().toISOString(),
     updatedAt: new Date().toISOString(),
     stats: {
@@ -153,9 +150,6 @@ const initialPlayers: Player[] = [
     sport: 'futebol',
     position: 'Atacante',
     teamId: '1',
-    goals: 8,
-    assists: 3,
-    age: 23,
     createdAt: new Date().toISOString(),
     updatedAt: new Date().toISOString(),
     stats: {
@@ -174,9 +168,6 @@ const initialPlayers: Player[] = [
     sport: 'volei',
     position: 'Levantador',
     teamId: '3',
-    goals: 0,
-    assists: 15,
-    age: 22,
     createdAt: new Date().toISOString(),
     updatedAt: new Date().toISOString(),
     stats: {

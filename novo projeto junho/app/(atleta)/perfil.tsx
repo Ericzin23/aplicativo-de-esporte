@@ -954,7 +954,7 @@ export default function PerfilAtleta() {
           <View style={styles.modalOverlay}>
             <View style={styles.modalContent}>
               <View style={styles.modalHeader}>
-                <Text style={styles.modalTitle}>Selecione sua Posição</Text>
+                <Text style={styles.modalHeaderTitle}>Selecione sua Posição</Text>
                 <TouchableOpacity onPress={() => setOpenPosicao(false)}>
                   <Ionicons name="close" size={24} color="#666" />
                 </TouchableOpacity>
@@ -974,11 +974,11 @@ export default function PerfilAtleta() {
                 listMode="MODAL"
               />
 
-              <TouchableOpacity 
-                style={styles.saveButton}
+              <TouchableOpacity
+                style={styles.positionSaveButton}
                 onPress={handleSalvarPosicao}
               >
-                <Text style={styles.saveButtonText}>Salvar Posição</Text>
+                <Text style={styles.positionSaveButtonText}>Salvar Posição</Text>
               </TouchableOpacity>
             </View>
           </View>
@@ -1367,13 +1367,13 @@ const styles = StyleSheet.create({
     borderColor: '#0066FF',
     backgroundColor: '#f9f9f9',
   },
-  saveButton: {
+  positionSaveButton: {
     backgroundColor: '#0066FF',
     padding: 15,
     borderRadius: 8,
     alignItems: 'center',
   },
-  saveButtonText: {
+  positionSaveButtonText: {
     color: '#fff',
     fontSize: 16,
     fontWeight: 'bold',
@@ -1384,8 +1384,8 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     padding: 10,
   },
-  modalTitle: {
+  modalHeaderTitle: {
     fontSize: 20,
     fontWeight: 'bold',
   },
-}); 
+});
