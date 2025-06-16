@@ -320,9 +320,9 @@ export default function Dashboard() {
           contentContainerStyle={styles.statsContainer}
           bounces={true}
         >
-          {statsData.map((stat, index) => (
+          {statsData.map((stat) => (
             <View
-              key={index}
+              key={stat.title}
               style={[styles.statCard, { borderLeftColor: stat.color }]}
             >
               <View style={styles.statContent}>
@@ -435,8 +435,8 @@ export default function Dashboard() {
           <Text style={styles.sectionTitle}>Ações Rápidas</Text>
           <View style={styles.quickActions}>
             {quickActions.map((action, index) => (
-              <Animated.View 
-                key={index}
+              <Animated.View
+                key={action.text}
                 style={[
                   styles.actionButtonContainer,
                   { transform: [{ scale: scaleAnims[index] }] }

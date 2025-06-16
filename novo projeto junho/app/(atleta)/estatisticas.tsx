@@ -53,9 +53,7 @@ export default function EstatisticasAtleta() {
     clearBadge('stats');
   }, []);
 
-  const periodTotals = calcularEstatisticasPeriodo(periodoSelecionado);
-
-  const calcularEstatisticasPeriodo = (periodo: string) => {
+  function calcularEstatisticasPeriodo(periodo: string) {
     const agora = new Date();
     const jogosFiltrados = stats.ultimosJogos.filter(jogo => {
       const data = new Date(jogo.data);
@@ -79,7 +77,9 @@ export default function EstatisticasAtleta() {
       },
       { gols: 0, assistencias: 0, bloqueios: 0, desempenhoPorPosicao: {} as Record<string, number> }
     );
-  };
+  }
+
+  const periodTotals = calcularEstatisticasPeriodo(periodoSelecionado);
 
   const compartilharDesempenho = async () => {
     try {

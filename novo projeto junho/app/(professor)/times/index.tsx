@@ -21,6 +21,7 @@ interface Team {
   sport: string;
   players: any[];
   createdAt: string;
+  professorId: string;
 }
 
 export default function Times() {
