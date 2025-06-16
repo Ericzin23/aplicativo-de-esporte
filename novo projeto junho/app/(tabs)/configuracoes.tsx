@@ -10,22 +10,19 @@ import {
   Switch,
   Modal,
   TextInput,
+  ActivityIndicator,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useAuth } from '../../contexts/AuthContext';
 import { useRouter } from 'expo-router';
-import { useColorScheme } from '../../hooks/useColorScheme';
 import { Colors } from '../../constants/Colors';
 import { createBackupZip } from '../../utils/backup';
-
 
 export default function Configuracoes() {
   const { user, signOut, updateProfile } = useAuth();
   const router = useRouter();
-  const { isDark, toggleColorScheme } = useColorScheme();
   const [notificationsEnabled, setNotificationsEnabled] = useState(true);
   const [showPasswordModal, setShowPasswordModal] = useState(false);
-  const [showPrivacyModal, setShowPrivacyModal] = useState(false);
   const [showEditProfileModal, setShowEditProfileModal] = useState(false);
   
   // Estados para trocar senha
@@ -38,11 +35,6 @@ export default function Configuracoes() {
   const [editName, setEditName] = useState(user?.name || '');
   const [editEmail, setEditEmail] = useState(user?.email || '');
   const [profileLoading, setProfileLoading] = useState(false);
-
-  // Estados para privacidade
-  const [dataSharing, setDataSharing] = useState(false);
-  const [analytics, setAnalytics] = useState(true);
-  const [marketing, setMarketing] = useState(false);
 
   const handleLogout = () => {
     Alert.alert(
@@ -118,15 +110,28 @@ export default function Configuracoes() {
     try {
       setProfileLoading(true);
       
+      // Primeiro fechamos o modal
+      setShowEditProfileModal(false);
+      
+      // Depois atualizamos o perfil
       await updateProfile({
         name: editName.trim(),
         email: editEmail.trim(),
       });
       
+      // Limpamos os estados
+      setEditName('');
+      setEditEmail('');
+      
+      // Mostramos a mensagem de sucesso
       Alert.alert('Sucesso!', 'Perfil atualizado com sucesso!');
-      setShowEditProfileModal(false);
+      
     } catch (error) {
-      Alert.alert('Erro', 'Não foi possível atualizar o perfil. Tente novamente.');
+      console.error('Erro ao atualizar perfil:', error);
+      Alert.alert(
+        'Erro',
+        'Não foi possível atualizar o perfil. Por favor, tente novamente.'
+      );
     } finally {
       setProfileLoading(false);
     }
@@ -142,21 +147,20 @@ export default function Configuracoes() {
           text: 'Fazer Backup',
           onPress: async () => {
             try {
-try {
-  const path = user
-    ? await createBackupZip({ user })
-    : await createBackupZip();
+              const path = user
+                ? await createBackupZip({ user })
+                : await createBackupZip();
 
-  Alert.alert(
-    'Sucesso!',
-    typeof path === 'string'
-      ? `Backup salvo em: ${path}`
-      : 'Backup realizado com sucesso!'
-  );
-} catch (e) {
-  Alert.alert('Erro', 'Não foi possível gerar o backup.');
-}
-
+              Alert.alert(
+                'Sucesso!',
+                typeof path === 'string'
+                  ? `Backup salvo em: ${path}`
+                  : 'Backup realizado com sucesso!'
+              );
+            } catch (e) {
+              Alert.alert('Erro', 'Não foi possível gerar o backup.');
+            }
+          },
         },
       ]
     );
@@ -174,28 +178,10 @@ try {
       },
     },
     {
-      title: 'Perfil Completo',
-      subtitle: 'Editar dados pessoais e esportivos',
-      icon: 'create',
-      onPress: () => router.push('/editarPerfil'),
-    },
-    {
       title: 'Trocar Senha',
       subtitle: 'Alterar senha de acesso',
       icon: 'key',
       onPress: () => setShowPasswordModal(true),
-    },
-    {
-      title: 'Privacidade',
-      subtitle: 'Configurações de privacidade e dados',
-      icon: 'shield-checkmark',
-      onPress: () => setShowPrivacyModal(true),
-    },
-    {
-      title: 'Perfil Esportivo',
-      subtitle: 'Configurar esporte e posição',
-      icon: 'fitness',
-      onPress: () => router.push('/perfilEsporte'),
     },
     {
       title: 'Relatórios',
@@ -213,19 +199,6 @@ try {
           onValueChange={setNotificationsEnabled}
           trackColor={{ false: '#767577', true: '#0066FF' }}
           thumbColor={notificationsEnabled ? '#fff' : '#f4f3f4'}
-        />
-      ),
-    },
-    {
-      title: 'Modo Escuro',
-      subtitle: 'Alternar tema do aplicativo',
-      icon: isDark ? 'moon' : 'sunny',
-      rightComponent: (
-        <Switch
-          value={isDark}
-          onValueChange={toggleColorScheme}
-          trackColor={{ false: '#767577', true: '#0066FF' }}
-          thumbColor={isDark ? '#fff' : '#f4f3f4'}
         />
       ),
     },
@@ -343,164 +316,143 @@ try {
   );
 
   // Modal para editar perfil
-  const EditProfileModal = () => (
-    <Modal
-      visible={showEditProfileModal}
-      transparent
-      animationType="slide"
-      onRequestClose={() => setShowEditProfileModal(false)}
-    >
-      <View style={styles.modalOverlay}>
-        <View style={styles.modalContainer}>
-          <View style={styles.modalHeader}>
-            <Text style={styles.modalTitle}>Editar Perfil</Text>
-            <TouchableOpacity onPress={() => setShowEditProfileModal(false)}>
-              <Ionicons name="close" size={24} color="#666" />
-            </TouchableOpacity>
-          </View>
+  const EditProfileModal = () => {
+    const [localName, setLocalName] = useState(editName);
+    const [localEmail, setLocalEmail] = useState(editEmail);
 
-          <View style={styles.modalContent}>
-            <View style={styles.inputGroup}>
-              <Text style={styles.inputLabel}>Nome</Text>
-              <TextInput
-                style={styles.modalInput}
-                placeholder="Digite seu nome"
-                value={editName}
-                onChangeText={setEditName}
-              />
-            </View>
+    React.useEffect(() => {
+      setLocalName(editName);
+      setLocalEmail(editEmail);
+    }, [showEditProfileModal]);
 
-            <View style={styles.inputGroup}>
-              <Text style={styles.inputLabel}>Email</Text>
-              <TextInput
-                style={[styles.modalInput, styles.disabledInput]}
-                value={editEmail}
-                editable={false}
-              />
-              <Text style={styles.helperText}>O email não pode ser alterado</Text>
-            </View>
+    const handleSave = async () => {
+      if (!localName.trim()) {
+        Alert.alert('Erro', 'Por favor, digite um nome válido.');
+        return;
+      }
 
-            <View style={styles.modalButtons}>
-              <TouchableOpacity
-                style={[styles.modalButton, styles.cancelButton]}
-                onPress={() => setShowEditProfileModal(false)}
-              >
-                <Text style={styles.cancelButtonText}>Cancelar</Text>
-              </TouchableOpacity>
-              
-              <TouchableOpacity
-                style={[styles.modalButton, styles.saveButton]}
-                onPress={handleEditProfile}
+      try {
+        setProfileLoading(true);
+        setShowEditProfileModal(false);
+        
+        await updateProfile({
+          name: localName.trim(),
+          email: localEmail.trim(),
+        });
+        
+        setEditName('');
+        setEditEmail('');
+        Alert.alert('Sucesso!', 'Perfil atualizado com sucesso!');
+        
+      } catch (error) {
+        console.error('Erro ao atualizar perfil:', error);
+        Alert.alert(
+          'Erro',
+          'Não foi possível atualizar o perfil. Por favor, tente novamente.'
+        );
+      } finally {
+        setProfileLoading(false);
+      }
+    };
+
+    return (
+      <Modal
+        visible={showEditProfileModal}
+        transparent
+        animationType="slide"
+        onRequestClose={() => {
+          if (!profileLoading) {
+            setShowEditProfileModal(false);
+          }
+        }}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalContainer}>
+            <View style={styles.modalHeader}>
+              <Text style={styles.modalTitle}>Editar Perfil</Text>
+              <TouchableOpacity 
+                onPress={() => {
+                  if (!profileLoading) {
+                    setShowEditProfileModal(false);
+                  }
+                }}
                 disabled={profileLoading}
               >
-                <Text style={styles.saveButtonText}>
-                  {profileLoading ? 'Salvando...' : 'Salvar'}
-                </Text>
+                <Ionicons 
+                  name="close" 
+                  size={24} 
+                  color={profileLoading ? "#999" : "#666"} 
+                />
               </TouchableOpacity>
+            </View>
+
+            <View style={styles.modalContent}>
+              <View style={styles.inputGroup}>
+                <Text style={styles.inputLabel}>Nome</Text>
+                <TextInput
+                  style={styles.modalInput}
+                  placeholder="Digite seu nome"
+                  value={localName}
+                  onChangeText={setLocalName}
+                  editable={!profileLoading}
+                />
+              </View>
+
+              <View style={styles.inputGroup}>
+                <Text style={styles.inputLabel}>Email</Text>
+                <TextInput
+                  style={[styles.modalInput, styles.disabledInput]}
+                  value={localEmail}
+                  editable={false}
+                />
+                <Text style={styles.helperText}>O email não pode ser alterado</Text>
+              </View>
+
+              <View style={styles.modalButtons}>
+                <TouchableOpacity
+                  style={[styles.modalButton, styles.cancelButton]}
+                  onPress={() => {
+                    if (!profileLoading) {
+                      setShowEditProfileModal(false);
+                    }
+                  }}
+                  disabled={profileLoading}
+                >
+                  <Text style={[
+                    styles.cancelButtonText,
+                    profileLoading && styles.disabledButtonText
+                  ]}>
+                    Cancelar
+                  </Text>
+                </TouchableOpacity>
+                
+                <TouchableOpacity
+                  style={[
+                    styles.modalButton, 
+                    styles.saveButton,
+                    profileLoading && styles.disabledButton
+                  ]}
+                  onPress={handleSave}
+                  disabled={profileLoading}
+                >
+                  <Text style={styles.saveButtonText}>
+                    {profileLoading ? 'Salvando...' : 'Salvar'}
+                  </Text>
+                </TouchableOpacity>
+              </View>
             </View>
           </View>
         </View>
-      </View>
-    </Modal>
-  );
-
-  // Modal para privacidade
-  const PrivacyModal = () => (
-    <Modal
-      visible={showPrivacyModal}
-      transparent
-      animationType="slide"
-      onRequestClose={() => setShowPrivacyModal(false)}
-    >
-      <View style={styles.modalOverlay}>
-        <View style={styles.modalContainer}>
-          <View style={styles.modalHeader}>
-            <Text style={styles.modalTitle}>Configurações de Privacidade</Text>
-            <TouchableOpacity onPress={() => setShowPrivacyModal(false)}>
-              <Ionicons name="close" size={24} color="#666" />
-            </TouchableOpacity>
-          </View>
-
-          <View style={styles.modalContent}>
-            <View style={styles.privacyOption}>
-              <View style={styles.privacyInfo}>
-                <Text style={styles.privacyTitle}>Compartilhamento de Dados</Text>
-                <Text style={styles.privacySubtitle}>Permitir compartilhamento de estatísticas com outros usuários</Text>
-              </View>
-              <Switch
-                value={dataSharing}
-                onValueChange={setDataSharing}
-                trackColor={{ false: '#767577', true: '#0066FF' }}
-                thumbColor={dataSharing ? '#fff' : '#f4f3f4'}
-              />
-            </View>
-
-            <View style={styles.privacyOption}>
-              <View style={styles.privacyInfo}>
-                <Text style={styles.privacyTitle}>Análise de Uso</Text>
-                <Text style={styles.privacySubtitle}>Ajudar a melhorar o app com dados de uso anônimos</Text>
-              </View>
-              <Switch
-                value={analytics}
-                onValueChange={setAnalytics}
-                trackColor={{ false: '#767577', true: '#0066FF' }}
-                thumbColor={analytics ? '#fff' : '#f4f3f4'}
-              />
-            </View>
-
-            <View style={styles.privacyOption}>
-              <View style={styles.privacyInfo}>
-                <Text style={styles.privacyTitle}>Comunicações de Marketing</Text>
-                <Text style={styles.privacySubtitle}>Receber emails sobre novidades e promoções</Text>
-              </View>
-              <Switch
-                value={marketing}
-                onValueChange={setMarketing}
-                trackColor={{ false: '#767577', true: '#0066FF' }}
-                thumbColor={marketing ? '#fff' : '#f4f3f4'}
-              />
-            </View>
-
-            <TouchableOpacity style={styles.privacyButton}>
-              <Text style={styles.privacyButtonText}>Ver Política de Privacidade</Text>
-            </TouchableOpacity>
-
-            <TouchableOpacity style={styles.privacyButton}>
-              <Text style={styles.privacyButtonText}>Solicitar Exclusão de Dados</Text>
-            </TouchableOpacity>
-
-            <View style={styles.modalButtons}>
-              <TouchableOpacity
-                style={[styles.modalButton, styles.saveButton, { width: '100%' }]}
-                onPress={() => {
-                  Alert.alert('Sucesso!', 'Configurações de privacidade salvas!');
-                  setShowPrivacyModal(false);
-                }}
-              >
-                <Text style={styles.saveButtonText}>Salvar Configurações</Text>
-              </TouchableOpacity>
-            </View>
-          </View>
-        </View>
-      </View>
-    </Modal>
-  );
+      </Modal>
+    );
+  };
 
   return (
-    <SafeAreaView
-      style={[
-        styles.container,
-        { backgroundColor: isDark ? Colors.dark.background : Colors.light.background },
-      ]}
-    >
+    <SafeAreaView style={styles.container}>
       <ScrollView showsVerticalScrollIndicator={false}>
         {/* Header */}
         <View style={styles.header}>
-          <Text
-            style={[styles.title, { color: isDark ? Colors.dark.text : Colors.light.text }]}
-          >
-            Configurações
-          </Text>
+          <Text style={styles.title}>Configurações</Text>
         </View>
 
         {/* User Info */}
@@ -519,7 +471,7 @@ try {
         {/* Settings Options */}
         <View style={styles.settingsContainer}>
           {settingsOptions.map((option, index) => (
-            <TouchableOpacity
+            <TouchableOpacity 
               key={index}
               style={styles.settingItem}
               onPress={option.onPress}
@@ -561,7 +513,6 @@ try {
       {/* Modals */}
       <PasswordModal />
       <EditProfileModal />
-      <PrivacyModal />
     </SafeAreaView>
   );
 }
@@ -569,11 +520,10 @@ try {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#f5f5f5',
+    backgroundColor: '#fff',
   },
   header: {
     padding: 20,
-    backgroundColor: '#fff',
     borderBottomWidth: 1,
     borderBottomColor: '#e0e0e0',
   },
@@ -686,7 +636,6 @@ const styles = StyleSheet.create({
     fontSize: 12,
     color: '#999',
   },
-  // Modal Styles
   modalOverlay: {
     flex: 1,
     backgroundColor: 'rgba(0, 0, 0, 0.5)',
@@ -775,37 +724,10 @@ const styles = StyleSheet.create({
     color: '#fff',
     fontWeight: '600',
   },
-  // Privacy Modal Styles
-  privacyOption: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingVertical: 15,
-    borderBottomWidth: 1,
-    borderBottomColor: '#f0f0f0',
+  disabledButton: {
+    backgroundColor: '#f0f0f0',
   },
-  privacyInfo: {
-    flex: 1,
-    marginRight: 15,
-  },
-  privacyTitle: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: '#333',
-    marginBottom: 4,
-  },
-  privacySubtitle: {
-    fontSize: 12,
-    color: '#666',
-  },
-  privacyButton: {
-    paddingVertical: 15,
-    borderBottomWidth: 1,
-    borderBottomColor: '#f0f0f0',
-  },
-  privacyButtonText: {
-    fontSize: 14,
-    color: '#0066FF',
-    fontWeight: '500',
+  disabledButtonText: {
+    color: '#999',
   },
 }); 

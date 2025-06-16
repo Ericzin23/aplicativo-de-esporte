@@ -106,8 +106,6 @@ export default function RootLayout() {
     </AuthProvider>
   </AppThemeProvider>
 </ThemeProvider>
-
-    </ThemeProvider>
   );
 }
 

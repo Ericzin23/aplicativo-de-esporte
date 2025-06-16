@@ -1,376 +1,459 @@
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import {
   View,
-  Text,
   StyleSheet,
   ScrollView,
-  TouchableOpacity,
-  SafeAreaView,
   TextInput,
-  Alert,
-  Image,
+  SafeAreaView,
+  TouchableOpacity,
+  Dimensions,
   Animated,
 } from 'react-native';
-import { Ionicons } from '@expo/vector-icons';
+import { Text, Card, Button, Portal, Dialog, Chip, PaperProvider, MD3LightTheme, Avatar, Surface, useTheme, Menu, Divider } from 'react-native-paper';
+import { Stack } from 'expo-router';
+import { Ionicons, MaterialCommunityIcons, FontAwesome5 } from '@expo/vector-icons';
 import { useAppData } from '../../contexts/AppDataContext';
-import { AddPlayerModal } from '../../components/AddPlayerModal';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import { LinearGradient } from 'expo-linear-gradient';
+import { BlurView } from 'expo-blur';
 
-interface Player {
-  id: string;
-  name: string;
-  sport: string;
-  position: string;
-  teamId: string;
-  goals: number;
-  assists: number;
-  age: number;
-  createdAt: string;
+// Comandos de feedback pré-prontos
+const COMANDOS_FEEDBACK = [
+  'Excelente desempenho no treino',
+  'Precisa melhorar a técnica',
+  'Bom trabalho em equipe',
+  'Necessita mais dedicação',
+  'Ótimo progresso',
+  'Falta pontualidade',
+  'Bom comportamento',
+  'Precisa melhorar a comunicação',
+];
+
+// Adicionar mais posições esportivas
+const POSICOES = {
+  futebol: ['Atacante', 'Meio-Campo', 'Defensor', 'Goleiro', 'Lateral', 'Volante', 'Ponta'],
+  volei: ['Levantador', 'Ponteiro', 'Central', 'Oposto', 'Líbero', 'Atacante'],
+  basquete: ['Armador', 'Ala', 'Ala-Pivô', 'Pivô', 'Escolta'],
+  handebol: ['Goleiro', 'Ponta', 'Meia', 'Armador', 'Pivô'],
+};
+
+// Adicionar mais estatísticas
+const ESTATISTICAS = {
+  futebol: ['Gols', 'Assistências', 'Desarmes', 'Passes', 'Faltas', 'Cartões'],
+  volei: ['Pontos', 'Bloqueios', 'Saque', 'Recepção', 'Levantamento'],
+  basquete: ['Pontos', 'Rebotes', 'Assistências', 'Roubadas', 'Bloqueios'],
+  handebol: ['Gols', 'Assistências', 'Bloqueios', 'Roubadas', 'Faltas'],
+};
+
+interface Feedback {
+  mensagem: string;
+  data: string;
+  professor: string;
 }
 
-export default function Jogadores() {
-  const [searchText, setSearchText] = useState('');
-  const [selectedSport, setSelectedSport] = useState('Todos');
-  const [selectedPosition, setSelectedPosition] = useState('Todos');
-  const [showPlayerModal, setShowPlayerModal] = useState(false);
-  const [editingPlayer, setEditingPlayer] = useState<Player | null>(null);
-  const { players, teams, getPlayersByPosition, getPlayersBySport } = useAppData();
+export default function JogadoresScreen() {
+  const theme = useTheme();
+  const { players, teams, updatePlayer } = useAppData();
+  const [busca, setBusca] = useState('');
+  const [timeFiltro, setTimeFiltro] = useState('');
+  const [esporteFiltro, setEsporteFiltro] = useState('');
+  const [posicaoFiltro, setPosicaoFiltro] = useState('');
+  const [jogadorSelecionado, setJogadorSelecionado] = useState<any>(null);
+  const [showModal, setShowModal] = useState(false);
+  const [showRelatorios, setShowRelatorios] = useState(false);
+  const [feedbacks, setFeedbacks] = useState<Record<string, Feedback[]>>({});
+  const [menuVisible, setMenuVisible] = useState(false);
+  const scrollY = new Animated.Value(0);
 
-  const sports = ['Todos', 'Futebol', 'Vôlei', 'Basquete', 'Futsal', 'Handebol'];
+  // Carregar feedbacks do storage
+  React.useEffect(() => {
+    const loadFeedbacks = async () => {
+      try {
+        const storedFeedbacks = await AsyncStorage.getItem('feedbacks');
+        if (storedFeedbacks) {
+          setFeedbacks(JSON.parse(storedFeedbacks));
+        }
+      } catch (error) {
+        console.error('Erro ao carregar feedbacks:', error);
+      }
+    };
+    loadFeedbacks();
+  }, []);
 
-  const sportsPositions: { [key: string]: string[] } = {
-    futebol: ['Goleiro', 'Zagueiro', 'Lateral Direito', 'Lateral Esquerdo', 'Volante', 'Meio-campo', 'Meia-atacante', 'Ponta Direita', 'Ponta Esquerda', 'Atacante', 'Centroavante'],
-    volei: ['Levantador', 'Oposto', 'Central', 'Ponteiro', 'Líbero'],
-    basquete: ['Armador', 'Ala-armador', 'Ala', 'Ala-pivô', 'Pivô'],
-    futsal: ['Goleiro', 'Fixo', 'Ala Direita', 'Ala Esquerda', 'Pivô'],
-    handebol: ['Goleiro', 'Armador Central', 'Armador Lateral', 'Meia', 'Ponta', 'Pivô'],
-  };
+  // Lista de times para filtro
+  const times = useMemo(() => {
+    return teams.map(team => team.name);
+  }, [teams]);
 
-  // Obter posições baseadas no esporte selecionado
-  const getAvailablePositions = () => {
-    if (selectedSport === 'Todos') {
-      const allPositions = Object.values(sportsPositions).flat();
-      return ['Todos', ...Array.from(new Set(allPositions))];
+  // Filtra jogadores por nome, time, esporte e posição
+  const jogadoresFiltrados = useMemo(() => {
+    return players.filter(jogador => {
+      const matchBusca = jogador.name.toLowerCase().includes(busca.toLowerCase());
+      const matchTime = !timeFiltro || jogador.teamId === timeFiltro;
+      const matchEsporte = !esporteFiltro || jogador.sport === esporteFiltro;
+      const matchPosicao = !posicaoFiltro || jogador.position === posicaoFiltro;
+      return matchBusca && matchTime && matchEsporte && matchPosicao;
+    });
+  }, [players, busca, timeFiltro, esporteFiltro, posicaoFiltro]);
+
+  // Adiciona feedback ao jogador
+  const adicionarFeedback = async (mensagem: string) => {
+    if (!jogadorSelecionado) return;
+
+    const novoFeedback: Feedback = {
+      mensagem,
+      data: new Date().toLocaleDateString(),
+      professor: 'Professor', // Substituir pelo nome real do professor
+    };
+
+    const novosFeedbacks = {
+      ...feedbacks,
+      [jogadorSelecionado.id]: [
+        ...(feedbacks[jogadorSelecionado.id] || []),
+        novoFeedback,
+      ],
+    };
+
+    try {
+      await AsyncStorage.setItem('feedbacks', JSON.stringify(novosFeedbacks));
+      setFeedbacks(novosFeedbacks);
+      setShowModal(false);
+    } catch (error) {
+      console.error('Erro ao salvar feedback:', error);
     }
-    const sportKey = selectedSport.toLowerCase();
-    return ['Todos', ...(sportsPositions[sportKey] || [])];
   };
 
-  const filteredPlayers = players.filter(player => {
-    const team = teams.find(t => t.id === player.teamId);
-    const matchesSearch = player.name.toLowerCase().includes(searchText.toLowerCase()) ||
-                         (team?.name.toLowerCase().includes(searchText.toLowerCase()) || false);
-    
-    const matchesSport = selectedSport === 'Todos' || 
-                        player.sport === selectedSport.toLowerCase() ||
-                        (selectedSport === 'Futebol' && player.sport === 'futebol') ||
-                        (selectedSport === 'Vôlei' && player.sport === 'volei') ||
-                        (selectedSport === 'Basquete' && player.sport === 'basquete') ||
-                        (selectedSport === 'Futsal' && player.sport === 'futsal') ||
-                        (selectedSport === 'Handebol' && player.sport === 'handebol');
-    
-    const matchesPosition = selectedPosition === 'Todos' || player.position === selectedPosition;
-    
-    return matchesSearch && matchesSport && matchesPosition;
+  const headerHeight = scrollY.interpolate({
+    inputRange: [0, 100],
+    outputRange: [140, 80],
+    extrapolate: 'clamp',
   });
 
-  const handleAddPlayer = () => {
-    setEditingPlayer(null);
-    setShowPlayerModal(true);
-  };
-
-  const handleEditPlayer = (player: Player) => {
-    setEditingPlayer(player);
-    setShowPlayerModal(true);
-  };
-
-  const handlePlayerPress = (player: Player) => {
-    const team = teams.find(t => t.id === player.teamId);
-    const sportLabel = sports.find(s => s.toLowerCase() === player.sport) || player.sport;
-    
-    Alert.alert(
-      player.name,
-      `Esporte: ${sportLabel}\nPosição: ${player.position}\nTime: ${team?.name || 'Sem time'}\nIdade: ${player.age} anos\nGols: ${player.goals}\nAssistências: ${player.assists}`,
-      [
-        { text: 'Fechar', style: 'cancel' },
-        { text: 'Editar', onPress: () => handleEditPlayer(player) }
-      ]
-    );
-  };
-
-  const handleCloseModal = () => {
-    setShowPlayerModal(false);
-    setEditingPlayer(null);
-  };
-
-  const getSportIcon = (sport: string) => {
-    switch (sport) {
-      case 'futebol': return 'football';
-      case 'volei': return 'basketball'; // Usando basketball como aproximação
-      case 'basquete': return 'basketball';
-      case 'futsal': return 'football';
-      case 'handebol': return 'basketball';
-      default: return 'fitness';
-    }
-  };
-
-  const getSportColor = (sport: string) => {
-    switch (sport) {
-      case 'futebol': return '#4CAF50';
-      case 'volei': return '#FF9800';
-      case 'basquete': return '#FF5722';
-      case 'futsal': return '#2196F3';
-      case 'handebol': return '#9C27B0';
-      default: return '#666';
-    }
-  };
-
-  const getPositionIcon = (position: string) => {
-    // Ícones para futebol/futsal
-    if (['Goleiro'].includes(position)) return 'shield';
-    if (['Zagueiro', 'Lateral Direito', 'Lateral Esquerdo', 'Fixo'].includes(position)) return 'person-outline';
-    if (['Volante', 'Meio-campo', 'Meia-atacante'].includes(position)) return 'football';
-    if (['Ponta Direita', 'Ponta Esquerda', 'Atacante', 'Centroavante', 'Pivô'].includes(position)) return 'flash';
-    
-    // Ícones para vôlei
-    if (['Levantador'].includes(position)) return 'hand-left';
-    if (['Oposto', 'Central', 'Ponteiro'].includes(position)) return 'trending-up';
-    if (['Líbero'].includes(position)) return 'shield-checkmark';
-    
-    // Ícones para basquete
-    if (['Armador', 'Ala-armador'].includes(position)) return 'play';
-    if (['Ala', 'Ala-pivô'].includes(position)) return 'swap-horizontal';
-    
-    // Ícones para handebol
-    if (['Armador Central', 'Armador Lateral', 'Meia', 'Ponta'].includes(position)) return 'hand-right';
-    
-    return 'person';
-  };
-
-  const getPositionColor = (position: string) => {
-    // Cores para futebol/futsal
-    if (['Goleiro'].includes(position)) return '#FF9800';
-    if (['Zagueiro', 'Lateral Direito', 'Lateral Esquerdo', 'Fixo'].includes(position)) return '#4CAF50';
-    if (['Volante', 'Meio-campo', 'Meia-atacante'].includes(position)) return '#2196F3';
-    if (['Ponta Direita', 'Ponta Esquerda', 'Atacante', 'Centroavante', 'Pivô'].includes(position)) return '#F44336';
-    
-    // Cores para vôlei
-    if (['Levantador'].includes(position)) return '#9C27B0';
-    if (['Oposto', 'Central', 'Ponteiro'].includes(position)) return '#FF5722';
-    if (['Líbero'].includes(position)) return '#607D8B';
-    
-    // Cores para basquete
-    if (['Armador', 'Ala-armador'].includes(position)) return '#3F51B5';
-    if (['Ala', 'Ala-pivô'].includes(position)) return '#FF9800';
-    
-    // Cores para handebol
-    if (['Armador Central', 'Armador Lateral', 'Meia', 'Ponta'].includes(position)) return '#795548';
-    
-    return '#666';
-  };
+  const headerOpacity = scrollY.interpolate({
+    inputRange: [0, 100],
+    outputRange: [1, 0.95],
+    extrapolate: 'clamp',
+  });
 
   return (
-    <SafeAreaView style={styles.container}>
-      {/* Header */}
-      <View style={styles.header}>
-        <Text style={styles.title}>Jogadores</Text>
-        <TouchableOpacity 
-          style={styles.addButton} 
-          onPress={handleAddPlayer}
-          activeOpacity={0.7}
-        >
-          <Ionicons name="person-add" size={24} color="#fff" />
-        </TouchableOpacity>
-      </View>
-
-      {/* Search */}
-      <View style={styles.searchContainer}>
-        <Ionicons name="search" size={20} color="#666" style={styles.searchIcon} />
-        <TextInput
-          style={styles.searchInput}
-          placeholder="Buscar jogadores ou times..."
-          value={searchText}
-          onChangeText={setSearchText}
-        />
-        {searchText.length > 0 && (
-          <TouchableOpacity onPress={() => setSearchText('')} style={styles.clearButton}>
-            <Ionicons name="close-circle" size={20} color="#666" />
-          </TouchableOpacity>
-        )}
-      </View>
-
-      {/* Sport Filter */}
-      <ScrollView
-        horizontal
-        showsHorizontalScrollIndicator={false}
-        style={styles.filterContainer}
-        contentContainerStyle={styles.filterContent}
-        bounces={true}
-      >
-        {sports.map((sport) => (
-          <TouchableOpacity
-            key={sport}
-            style={[
-              styles.filterButton,
-              selectedSport === sport && styles.filterButtonActive
-            ]}
-            onPress={() => {
-              setSelectedSport(sport);
-              setSelectedPosition('Todos'); // Reset position filter when changing sport
-            }}
-            activeOpacity={0.7}
-          >
-            <Text style={[
-              styles.filterText,
-              selectedSport === sport && styles.filterTextActive
-            ]}>
-              {sport}
-            </Text>
-          </TouchableOpacity>
-        ))}
-      </ScrollView>
-
-      {/* Position Filter */}
-      <ScrollView
-        horizontal
-        showsHorizontalScrollIndicator={false}
-        style={styles.positionFilterContainer}
-        contentContainerStyle={styles.filterContent}
-        bounces={true}
-      >
-        {getAvailablePositions().map((position) => (
-          <TouchableOpacity
-            key={position}
-            style={[
-              styles.positionFilterButton,
-              selectedPosition === position && styles.positionFilterButtonActive
-            ]}
-            onPress={() => setSelectedPosition(position)}
-            activeOpacity={0.7}
-          >
-            <Text style={[
-              styles.positionFilterText,
-              selectedPosition === position && styles.positionFilterTextActive
-            ]}>
-              {position}
-            </Text>
-          </TouchableOpacity>
-        ))}
-      </ScrollView>
-
-      {/* Stats Summary */}
-      <View style={styles.summaryContainer}>
-        <View style={styles.summaryItem}>
-          <Text style={styles.summaryValue}>{filteredPlayers.length}</Text>
-          <Text style={styles.summaryLabel}>Jogadores</Text>
-        </View>
-        <View style={styles.summaryItem}>
-          <Text style={styles.summaryValue}>{filteredPlayers.reduce((sum, player) => sum + player.goals, 0)}</Text>
-          <Text style={styles.summaryLabel}>Gols</Text>
-        </View>
-        <View style={styles.summaryItem}>
-          <Text style={styles.summaryValue}>{filteredPlayers.reduce((sum, player) => sum + player.assists, 0)}</Text>
-          <Text style={styles.summaryLabel}>Assistências</Text>
-        </View>
-      </View>
-
-      {/* Players List */}
-      <ScrollView 
-        style={styles.playersList} 
-        showsVerticalScrollIndicator={false}
-        bounces={true}
-      >
-        {filteredPlayers.length > 0 ? (
-          filteredPlayers.map((player) => {
-            const team = teams.find(t => t.id === player.teamId);
-            const sportLabel = sports.find(s => s.toLowerCase() === player.sport) || player.sport;
-            
-            return (
-              <TouchableOpacity
-                key={player.id}
-                style={styles.playerCard}
-                onPress={() => handlePlayerPress(player)}
-                activeOpacity={0.7}
+    <PaperProvider theme={MD3LightTheme}>
+      <SafeAreaView style={styles.container}>
+        <Stack.Screen 
+          options={{ 
+            title: 'Jogadores',
+            headerTransparent: true,
+            headerBlurEffect: 'light',
+            headerStyle: {
+              backgroundColor: 'transparent',
+            },
+            headerTintColor: '#fff',
+            headerRight: () => (
+              <TouchableOpacity 
+                onPress={() => setMenuVisible(true)}
+                style={styles.menuButton}
               >
-                <View style={styles.playerHeader}>
-                  <View style={styles.playerInfo}>
-                    <View style={styles.playerAvatar}>
-                      <Ionicons name="person" size={24} color="#666" />
-                    </View>
-                    <View style={styles.playerDetails}>
-                      <Text style={styles.playerName}>{player.name}</Text>
-                      <Text style={styles.playerTeam}>{team?.name || 'Sem time'}</Text>
-                      <View style={styles.tagsContainer}>
-                        <View style={[styles.sportTag, { backgroundColor: getSportColor(player.sport) }]}>
-                          <Ionicons
-                            name={getSportIcon(player.sport) as any}
-                            size={12}
-                            color="#fff"
-                          />
-                          <Text style={styles.sportTagText}>
-                            {typeof sportLabel === 'string' ? sportLabel.charAt(0).toUpperCase() + sportLabel.slice(1) : player.sport}
-                          </Text>
-                        </View>
-                        <View style={styles.positionContainer}>
-                          <Ionicons
-                            name={getPositionIcon(player.position) as any}
-                            size={14}
-                            color={getPositionColor(player.position)}
-                          />
-                          <Text style={[styles.playerPosition, { color: getPositionColor(player.position) }]}>
-                            {player.position}
-                          </Text>
+                <MaterialCommunityIcons name="filter-variant" size={24} color="#fff" />
+              </TouchableOpacity>
+            ),
+          }} 
+        />
+        
+        {/* Menu de Filtros */}
+        <Menu
+          visible={menuVisible}
+          onDismiss={() => setMenuVisible(false)}
+          anchor={{ x: Dimensions.get('window').width - 50, y: 50 }}
+          contentStyle={styles.menuContent}
+        >
+          <Menu.Item
+            title="Filtrar por Esporte"
+            leadingIcon="basketball"
+            onPress={() => {
+              setMenuVisible(false);
+              // Mostrar modal de seleção de esporte
+            }}
+          />
+          <Divider />
+          <Menu.Item
+            title="Filtrar por Posição"
+            leadingIcon="account-group"
+            onPress={() => {
+              setMenuVisible(false);
+              // Mostrar modal de seleção de posição
+            }}
+          />
+          <Divider />
+          <Menu.Item
+            title="Limpar Filtros"
+            leadingIcon="filter-remove"
+            onPress={() => {
+              setEsporteFiltro('');
+              setPosicaoFiltro('');
+              setMenuVisible(false);
+            }}
+          />
+        </Menu>
+
+        {/* Header Animado */}
+        <Animated.View style={[styles.headerContainer, { height: headerHeight, opacity: headerOpacity }]}>
+          <LinearGradient
+            colors={['#0066FF', '#00B4D8']}
+            style={styles.headerGradient}
+          >
+            <View style={styles.headerContent}>
+              <Text style={styles.headerTitle}>Jogadores</Text>
+              <View style={styles.headerStats}>
+                <View style={styles.headerStat}>
+                  <MaterialCommunityIcons name="account-group" size={20} color="#fff" />
+                  <Text style={styles.headerStatText}>{players.length} Jogadores</Text>
+                </View>
+                <View style={styles.headerStat}>
+                  <MaterialCommunityIcons name="trophy" size={20} color="#fff" />
+                  <Text style={styles.headerStatText}>{teams.length} Times</Text>
+                </View>
+              </View>
+            </View>
+          </LinearGradient>
+        </Animated.View>
+
+        {/* Conteúdo Principal */}
+        <View style={styles.mainContent}>
+          {/* Barra de Busca */}
+          <Surface style={styles.searchSurface} elevation={4}>
+            <View style={styles.searchContainer}>
+              <Ionicons name="search" size={20} color="#666" style={styles.searchIcon} />
+              <TextInput
+                style={styles.busca}
+                placeholder="Buscar jogador..."
+                placeholderTextColor="#999"
+                value={busca}
+                onChangeText={setBusca}
+              />
+              {busca.length > 0 && (
+                <TouchableOpacity onPress={() => setBusca('')}>
+                  <Ionicons name="close-circle" size={20} color="#666" />
+                </TouchableOpacity>
+              )}
+            </View>
+          </Surface>
+          
+          {/* Filtros */}
+          <View style={styles.filtrosWrapper}>
+            <ScrollView 
+              horizontal 
+              showsHorizontalScrollIndicator={false}
+              style={styles.filtrosContainer}
+              contentContainerStyle={styles.filtrosContent}
+            >
+              <Chip
+                selected={!timeFiltro}
+                onPress={() => setTimeFiltro('')}
+                style={[styles.filtroChip, !timeFiltro && styles.filtroChipSelected]}
+                mode="outlined"
+                icon="account-group"
+              >
+                Todos
+              </Chip>
+              
+              {times.map(time => (
+                <Chip
+                  key={time}
+                  selected={timeFiltro === time}
+                  onPress={() => setTimeFiltro(time)}
+                  style={[styles.filtroChip, timeFiltro === time && styles.filtroChipSelected]}
+                  mode="outlined"
+                  icon="tshirt-crew"
+                >
+                  {time}
+                </Chip>
+              ))}
+            </ScrollView>
+          </View>
+
+          {/* Lista de Jogadores */}
+          <Animated.ScrollView 
+            style={styles.lista}
+            onScroll={Animated.event(
+              [{ nativeEvent: { contentOffset: { y: scrollY } } }],
+              { useNativeDriver: false }
+            )}
+            scrollEventThrottle={16}
+          >
+            {jogadoresFiltrados.map(jogador => {
+              const team = teams.find(t => t.id === jogador.teamId);
+              const jogadorFeedbacks = feedbacks[jogador.id] || [];
+              
+              return (
+                <Card 
+                  key={jogador.id} 
+                  style={styles.card}
+                  onPress={() => {
+                    setJogadorSelecionado(jogador);
+                    setShowModal(true);
+                  }}
+                >
+                  <LinearGradient
+                    colors={['#fff', '#f8f9fa']}
+                    style={styles.cardGradient}
+                  >
+                    <Card.Content style={styles.cardContent}>
+                      <View style={styles.jogadorInfo}>
+                        <Avatar.Text 
+                          size={45} 
+                          label={jogador.name.split(' ').map(n => n[0]).join('')} 
+                          style={styles.avatar}
+                          labelStyle={styles.avatarLabel}
+                        />
+                        <View style={styles.jogadorDetalhes}>
+                          <Text style={styles.nomeJogador}>{jogador.name}</Text>
+                          <View style={styles.infoContainer}>
+                            <View style={styles.infoItem}>
+                              <MaterialCommunityIcons name="tshirt-crew" size={14} color="#0066FF" />
+                              <Text style={styles.infoText}>{team?.name || 'Sem time'}</Text>
+                            </View>
+                            <View style={styles.infoItem}>
+                              <MaterialCommunityIcons name="soccer" size={14} color="#0066FF" />
+                              <Text style={styles.infoText}>{jogador.position}</Text>
+                            </View>
+                            <View style={styles.infoItem}>
+                              <FontAwesome5 name={getSportIcon(jogador.sport)} size={12} color="#0066FF" />
+                              <Text style={styles.infoText}>{jogador.sport}</Text>
+                            </View>
+                          </View>
                         </View>
                       </View>
-                    </View>
-                  </View>
-                  <View style={styles.playerAge}>
-                    <Text style={styles.ageText}>{player.age}</Text>
-                    <Text style={styles.ageLabel}>anos</Text>
-                  </View>
-                </View>
-                
-                <View style={styles.playerStats}>
-                  <View style={styles.statItem}>
-                    <Text style={styles.statValue}>{player.goals}</Text>
-                    <Text style={styles.statLabel}>Gols</Text>
-                  </View>
-                  <View style={styles.statItem}>
-                    <Text style={styles.statValue}>{player.assists}</Text>
-                    <Text style={styles.statLabel}>Assistências</Text>
-                  </View>
-                  <TouchableOpacity 
-                    style={styles.editButton}
-                    onPress={() => handleEditPlayer(player)}
-                  >
-                    <Ionicons name="create-outline" size={20} color="#0066FF" />
-                  </TouchableOpacity>
-                </View>
-              </TouchableOpacity>
-            );
-          })
-        ) : (
-          <View style={styles.emptyState}>
-            <Ionicons name="people-outline" size={64} color="#ccc" />
-            <Text style={styles.emptyTitle}>Nenhum jogador encontrado</Text>
-            <Text style={styles.emptySubtitle}>
-              {searchText ? 'Tente ajustar sua busca' : 'Adicione jogadores para começar'}
-            </Text>
-            {!searchText && (
-              <TouchableOpacity style={styles.emptyButton} onPress={handleAddPlayer}>
-                <Text style={styles.emptyButtonText}>Adicionar Primeiro Jogador</Text>
-              </TouchableOpacity>
-            )}
-          </View>
-        )}
-      </ScrollView>
+                      
+                      <View style={styles.statsContainer}>
+                        <View style={styles.statItem}>
+                          <MaterialCommunityIcons name="goal" size={20} color="#0066FF" />
+                          <Text style={styles.statValue}>{jogador.goals}</Text>
+                          <Text style={styles.statLabel}>Gols</Text>
+                        </View>
+                        <View style={styles.statDivider} />
+                        <View style={styles.statItem}>
+                          <MaterialCommunityIcons name="handshake" size={20} color="#0066FF" />
+                          <Text style={styles.statValue}>{jogador.assists}</Text>
+                          <Text style={styles.statLabel}>Assist.</Text>
+                        </View>
+                        <View style={styles.statDivider} />
+                        <View style={styles.statItem}>
+                          <MaterialCommunityIcons name="message-text" size={20} color="#0066FF" />
+                          <Text style={styles.statValue}>{jogadorFeedbacks.length}</Text>
+                          <Text style={styles.statLabel}>Feedbacks</Text>
+                        </View>
+                      </View>
+                    </Card.Content>
+                  </LinearGradient>
+                </Card>
+              );
+            })}
+          </Animated.ScrollView>
+        </View>
 
-      <AddPlayerModal
-        visible={showPlayerModal}
-        onClose={handleCloseModal}
-        editingPlayer={editingPlayer}
-      />
-    </SafeAreaView>
+        {/* Modal de Feedback */}
+        <Portal>
+          <Dialog
+            visible={showModal}
+            onDismiss={() => setShowModal(false)}
+            style={styles.modal}
+          >
+            <BlurView intensity={20} style={styles.modalBlur}>
+              <Dialog.Title style={styles.modalTitle}>
+                <MaterialCommunityIcons name="message-text" size={24} color="#0066FF" />
+                <Text style={styles.modalTitleText}>
+                  Feedback - {jogadorSelecionado?.name}
+                </Text>
+              </Dialog.Title>
+              <Dialog.Content>
+                <ScrollView style={styles.comandosContainer}>
+                  {COMANDOS_FEEDBACK.map((comando, index) => (
+                    <Button
+                      key={index}
+                      mode="outlined"
+                      onPress={() => adicionarFeedback(comando)}
+                      style={styles.comandoButton}
+                      icon="message-text"
+                      contentStyle={styles.comandoButtonContent}
+                    >
+                      {comando}
+                    </Button>
+                  ))}
+                </ScrollView>
+
+                <Button
+                  mode="contained"
+                  onPress={() => {
+                    setShowModal(false);
+                    setShowRelatorios(true);
+                  }}
+                  style={styles.verRelatoriosButton}
+                  icon="file-document"
+                  contentStyle={styles.verRelatoriosButtonContent}
+                >
+                  Ver Relatórios
+                </Button>
+              </Dialog.Content>
+            </BlurView>
+          </Dialog>
+        </Portal>
+
+        {/* Modal de Relatórios */}
+        <Portal>
+          <Dialog
+            visible={showRelatorios}
+            onDismiss={() => setShowRelatorios(false)}
+            style={styles.modal}
+          >
+            <BlurView intensity={20} style={styles.modalBlur}>
+              <Dialog.Title style={styles.modalTitle}>
+                <MaterialCommunityIcons name="file-document" size={24} color="#0066FF" />
+                <Text style={styles.modalTitleText}>
+                  Relatórios - {jogadorSelecionado?.name}
+                </Text>
+              </Dialog.Title>
+              <Dialog.Content>
+                <ScrollView style={styles.relatoriosContainer}>
+                  {(feedbacks[jogadorSelecionado?.id] || []).map((relatorio, index) => (
+                    <Card key={index} style={styles.relatorioCard}>
+                      <Card.Content>
+                        <Text style={styles.relatorioMensagem}>{relatorio.mensagem}</Text>
+                        <View style={styles.relatorioInfo}>
+                          <View style={styles.relatorioInfoItem}>
+                            <MaterialCommunityIcons name="calendar" size={14} color="#666" />
+                            <Text style={styles.relatorioData}>{relatorio.data}</Text>
+                          </View>
+                          <View style={styles.relatorioInfoItem}>
+                            <MaterialCommunityIcons name="account" size={14} color="#666" />
+                            <Text style={styles.relatorioProfessor}>{relatorio.professor}</Text>
+                          </View>
+                        </View>
+                      </Card.Content>
+                    </Card>
+                  ))}
+                </ScrollView>
+              </Dialog.Content>
+            </BlurView>
+          </Dialog>
+        </Portal>
+      </SafeAreaView>
+    </PaperProvider>
   );
+}
+
+// Função auxiliar para obter o ícone do esporte
+function getSportIcon(sport: string): string {
+  switch (sport.toLowerCase()) {
+    case 'futebol':
+      return 'futbol';
+    case 'volei':
+      return 'volleyball-ball';
+    case 'basquete':
+      return 'basketball-ball';
+    case 'handebol':
+      return 'hand-holding';
+    default:
+      return 'question';
+  }
 }
 
 const styles = StyleSheet.create({
@@ -378,272 +461,239 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: '#f5f5f5',
   },
-  header: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    paddingHorizontal: 20,
-    paddingVertical: 16,
-    backgroundColor: '#fff',
-    borderBottomWidth: 1,
-    borderBottomColor: '#e0e0e0',
+  headerContainer: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    zIndex: 10,
   },
-  title: {
-    fontSize: 24,
+  headerGradient: {
+    flex: 1,
+    justifyContent: 'flex-end',
+    padding: 16,
+  },
+  headerContent: {
+    marginBottom: 8,
+  },
+  headerTitle: {
+    fontSize: 28,
     fontWeight: 'bold',
-    color: '#333',
+    color: '#fff',
+    marginBottom: 4,
   },
-  addButton: {
-    backgroundColor: '#0066FF',
-    width: 44,
-    height: 44,
-    borderRadius: 22,
-    justifyContent: 'center',
+  headerStats: {
+    flexDirection: 'row',
+    marginTop: 4,
+  },
+  headerStat: {
+    flexDirection: 'row',
     alignItems: 'center',
-    shadowColor: '#0066FF',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.3,
-    shadowRadius: 4,
-    elevation: 4,
+    marginRight: 16,
+  },
+  headerStatText: {
+    color: '#fff',
+    marginLeft: 4,
+    fontSize: 13,
+  },
+  mainContent: {
+    flex: 1,
+    marginTop: 100,
+  },
+  searchSurface: {
+    marginHorizontal: 12,
+    marginBottom: 8,
+    borderRadius: 8,
+    backgroundColor: '#fff',
   },
   searchContainer: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#fff',
-    marginHorizontal: 20,
-    marginTop: 16,
-    paddingHorizontal: 16,
-    borderRadius: 12,
-    borderWidth: 1,
-    borderColor: '#e0e0e0',
+    paddingHorizontal: 8,
   },
   searchIcon: {
-    marginRight: 12,
+    marginRight: 4,
   },
-  searchInput: {
+  busca: {
     flex: 1,
-    paddingVertical: 12,
-    fontSize: 16,
+    padding: 8,
+    fontSize: 15,
     color: '#333',
   },
-  clearButton: {
-    padding: 4,
-  },
-  filterContainer: {
-    marginTop: 16,
+  filtrosWrapper: {
+    backgroundColor: '#fff',
+    paddingVertical: 8,
     marginBottom: 8,
   },
-  positionFilterContainer: {
-    marginBottom: 16,
+  filtrosContainer: {
+    flexGrow: 0,
   },
-  filterContent: {
-    paddingHorizontal: 20,
-    gap: 8,
+  filtrosContent: {
+    paddingHorizontal: 12,
   },
-  filterButton: {
-    paddingHorizontal: 16,
-    paddingVertical: 8,
+  filtroChip: {
+    marginRight: 6,
     backgroundColor: '#fff',
-    borderRadius: 20,
-    borderWidth: 1,
     borderColor: '#e0e0e0',
   },
-  filterButtonActive: {
+  filtroChipSelected: {
     backgroundColor: '#0066FF',
     borderColor: '#0066FF',
   },
-  filterText: {
-    fontSize: 14,
-    color: '#666',
-    fontWeight: '500',
-  },
-  filterTextActive: {
-    color: '#fff',
-  },
-  positionFilterButton: {
+  lista: {
+    flex: 1,
     paddingHorizontal: 12,
-    paddingVertical: 6,
-    backgroundColor: '#f8f9fa',
-    borderRadius: 16,
-    borderWidth: 1,
-    borderColor: '#e9ecef',
   },
-  positionFilterButtonActive: {
-    backgroundColor: '#e3f2fd',
-    borderColor: '#2196F3',
-  },
-  positionFilterText: {
-    fontSize: 12,
-    color: '#666',
-    fontWeight: '500',
-  },
-  positionFilterTextActive: {
-    color: '#2196F3',
-  },
-  summaryContainer: {
-    flexDirection: 'row',
-    backgroundColor: '#fff',
-    marginHorizontal: 20,
-    marginBottom: 16,
+  card: {
+    marginBottom: 8,
     borderRadius: 12,
-    padding: 16,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.1,
-    shadowRadius: 2,
-    elevation: 2,
+    overflow: 'hidden',
   },
-  summaryItem: {
-    flex: 1,
+  cardGradient: {
+    borderRadius: 12,
+  },
+  cardContent: {
+    padding: 12,
+  },
+  jogadorInfo: {
+    flexDirection: 'row',
     alignItems: 'center',
-  },
-  summaryValue: {
-    fontSize: 24,
-    fontWeight: 'bold',
-    color: '#0066FF',
-  },
-  summaryLabel: {
-    fontSize: 12,
-    color: '#666',
-    marginTop: 4,
-  },
-  playersList: {
-    flex: 1,
-    paddingHorizontal: 20,
-  },
-  playerCard: {
-    backgroundColor: '#fff',
-    borderRadius: 12,
-    padding: 16,
-    marginBottom: 12,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.1,
-    shadowRadius: 2,
-    elevation: 2,
-  },
-  playerHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'flex-start',
     marginBottom: 12,
   },
-  playerInfo: {
-    flexDirection: 'row',
-    flex: 1,
-  },
-  playerAvatar: {
-    width: 48,
-    height: 48,
-    borderRadius: 24,
-    backgroundColor: '#f0f0f0',
-    justifyContent: 'center',
-    alignItems: 'center',
+  avatar: {
+    backgroundColor: '#0066FF',
     marginRight: 12,
   },
-  playerDetails: {
+  avatarLabel: {
+    fontSize: 18,
+    fontWeight: 'bold',
+  },
+  jogadorDetalhes: {
     flex: 1,
   },
-  playerName: {
+  nomeJogador: {
     fontSize: 16,
     fontWeight: 'bold',
     color: '#333',
     marginBottom: 4,
   },
-  playerTeam: {
-    fontSize: 14,
-    color: '#666',
-    marginBottom: 8,
-  },
-  tagsContainer: {
+  infoContainer: {
     flexDirection: 'row',
+    flexWrap: 'wrap',
     gap: 8,
-    alignItems: 'center',
   },
-  sportTag: {
+  infoItem: {
     flexDirection: 'row',
     alignItems: 'center',
+    backgroundColor: '#E3F2FD',
     paddingHorizontal: 8,
-    paddingVertical: 4,
-    borderRadius: 12,
-    gap: 4,
+    paddingVertical: 2,
+    borderRadius: 4,
   },
-  sportTagText: {
-    fontSize: 10,
-    color: '#fff',
-    fontWeight: '600',
-  },
-  positionContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 4,
-  },
-  playerPosition: {
+  infoText: {
     fontSize: 12,
-    fontWeight: '600',
+    color: '#0066FF',
+    marginLeft: 4,
   },
-  playerAge: {
-    alignItems: 'center',
-  },
-  ageText: {
-    fontSize: 18,
-    fontWeight: 'bold',
-    color: '#333',
-  },
-  ageLabel: {
-    fontSize: 10,
-    color: '#666',
-  },
-  playerStats: {
+  statsContainer: {
     flexDirection: 'row',
-    justifyContent: 'space-between',
+    justifyContent: 'space-around',
     alignItems: 'center',
+    borderTopWidth: 1,
+    borderTopColor: '#e0e0e0',
+    paddingTop: 12,
   },
   statItem: {
     alignItems: 'center',
     flex: 1,
   },
+  statDivider: {
+    width: 1,
+    height: 30,
+    backgroundColor: '#e0e0e0',
+  },
   statValue: {
-    fontSize: 18,
+    fontSize: 16,
     fontWeight: 'bold',
     color: '#0066FF',
+    marginTop: 2,
   },
   statLabel: {
-    fontSize: 12,
+    fontSize: 11,
     color: '#666',
     marginTop: 2,
   },
-  editButton: {
-    padding: 8,
-    borderRadius: 8,
-    backgroundColor: '#f8f9fa',
+  modal: {
+    backgroundColor: 'transparent',
   },
-  emptyState: {
+  modalBlur: {
+    borderRadius: 16,
+    overflow: 'hidden',
+  },
+  modalTitle: {
+    flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'center',
-    paddingVertical: 60,
+    padding: 16,
+    borderBottomWidth: 1,
+    borderBottomColor: '#e0e0e0',
   },
-  emptyTitle: {
-    fontSize: 18,
+  modalTitleText: {
+    fontSize: 20,
     fontWeight: 'bold',
-    color: '#666',
+    marginLeft: 8,
+  },
+  comandosContainer: {
+    maxHeight: 300,
+  },
+  comandoButton: {
+    marginBottom: 8,
+    borderRadius: 8,
+  },
+  comandoButtonContent: {
+    paddingVertical: 8,
+  },
+  verRelatoriosButton: {
     marginTop: 16,
+    borderRadius: 8,
+  },
+  verRelatoriosButtonContent: {
+    paddingVertical: 8,
+  },
+  relatoriosContainer: {
+    maxHeight: 400,
+  },
+  relatorioCard: {
+    marginBottom: 8,
+    borderRadius: 8,
+  },
+  relatorioMensagem: {
+    fontSize: 14,
+    color: '#333',
     marginBottom: 8,
   },
-  emptySubtitle: {
-    fontSize: 14,
-    color: '#999',
-    textAlign: 'center',
-    marginBottom: 24,
+  relatorioInfo: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
   },
-  emptyButton: {
-    backgroundColor: '#0066FF',
-    paddingHorizontal: 24,
-    paddingVertical: 12,
+  relatorioInfoItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  relatorioData: {
+    fontSize: 12,
+    color: '#666',
+    marginLeft: 4,
+  },
+  relatorioProfessor: {
+    fontSize: 12,
+    color: '#666',
+    marginLeft: 4,
+  },
+  menuButton: {
+    padding: 8,
+  },
+  menuContent: {
+    backgroundColor: '#fff',
     borderRadius: 8,
-  },
-  emptyButtonText: {
-    color: '#fff',
-    fontWeight: '600',
   },
 }); 

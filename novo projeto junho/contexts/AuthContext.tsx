@@ -149,23 +149,30 @@ export function AuthProvider({ children }: AuthProviderProps) {
 
   async function updateProfile(userData: Partial<User>) {
     try {
-      if (user) {
-        const updatedUser = { ...user, ...userData };
-        await AsyncStorage.setItem('@GestaoTimes:user', JSON.stringify(updatedUser));
+      if (!user) {
+        throw new Error('Usuário não encontrado');
+      }
 
-        const storedUsers = await AsyncStorage.getItem('@GestaoTimes:users');
-        const users = storedUsers ? JSON.parse(storedUsers) : [];
+      const updatedUser = { ...user, ...userData };
+      await AsyncStorage.setItem('@GestaoTimes:user', JSON.stringify(updatedUser));
+
+      const storedUsers = await AsyncStorage.getItem('@GestaoTimes:users');
+      if (storedUsers) {
+        const users = JSON.parse(storedUsers);
         const userIndex = users.findIndex((u: User) => u.id === user.id);
-
+        
         if (userIndex !== -1) {
           users[userIndex] = updatedUser;
           await AsyncStorage.setItem('@GestaoTimes:users', JSON.stringify(users));
         }
-
-        setUser(updatedUser);
       }
+
+      setUser(updatedUser);
+
+      return updatedUser;
     } catch (error) {
       console.error('Erro ao atualizar perfil:', error);
+      throw error;
     }
   }
 
