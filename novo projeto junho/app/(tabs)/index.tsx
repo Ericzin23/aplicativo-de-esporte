@@ -234,7 +234,8 @@ export default function Dashboard() {
   const getSportIcon = (sport: string) => {
     if (!sport) return 'fitness';
     
-    switch (sport.toLowerCase()) {
+    const sportLower = sport.toLowerCase();
+    switch (sportLower) {
       case 'futebol': return 'football';
       case 'volei': case 'vôlei': return 'basketball';
       case 'basquete': return 'basketball';
@@ -245,7 +246,10 @@ export default function Dashboard() {
   };
 
   const getSportColor = (sport: string) => {
-    switch (sport.toLowerCase()) {
+    if (!sport) return '#666';
+    
+    const sportLower = sport.toLowerCase();
+    switch (sportLower) {
       case 'futebol': return '#4CAF50';
       case 'volei': case 'vôlei': return '#FF9800';
       case 'basquete': return '#FF5722';

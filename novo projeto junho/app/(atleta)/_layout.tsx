@@ -3,20 +3,33 @@ import { Ionicons } from '@expo/vector-icons';
 import { useAuth } from '../../contexts/AuthContext';
 import { useNotifications } from '../../contexts/NotificationContext';
 import { Redirect } from 'expo-router';
+import { useEffect } from 'react';
 
 export default function AtletaLayout() {
   const { user } = useAuth();
   const { badges } = useNotifications();
 
-  // Redirecionar se não for atleta
-  if (user && user.userType !== 'atleta') {
-    return <Redirect href="/(tabs)" />;
-  }
+  useEffect(() => {
+    console.log('🏃‍♂️ AtletaLayout - Verificando usuário:', {
+      exists: !!user,
+      userType: user?.userType,
+      email: user?.email
+    });
+  }, [user]);
 
   // Redirecionar se não estiver logado
   if (!user) {
+    console.log('🏃‍♂️ AtletaLayout - Redirecionando para login (usuário não encontrado)');
     return <Redirect href="/login" />;
   }
+
+  // Redirecionar se não for atleta
+  if (user.userType !== 'atleta') {
+    console.log('🏃‍♂️ AtletaLayout - Redirecionando para tabs (usuário não é atleta):', user.userType);
+    return <Redirect href="/(tabs)" />;
+  }
+
+  console.log('🏃‍♂️ AtletaLayout - Usuário atleta confirmado, renderizando layout');
 
   return (
     <Tabs

@@ -1,10 +1,9 @@
 import React, { createContext, useContext, useState, useEffect, ReactNode, useCallback } from 'react';
 import { getItem, setItem, StorageKeys } from '../utils/storage';
-import { useNotifications } from './NotificationContext';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import 'react-native-get-random-values';
 import { v4 as uuid } from 'uuid';
-import { View, ActivityIndicator } from 'react-native';
+import { View, ActivityIndicator, Alert } from 'react-native';
 
 interface Team {
   id: string;
@@ -87,6 +86,8 @@ interface AppDataContextType {
   };
   syncProfessorToAluno: (data: Partial<AppDataContextType>) => void;
   syncAlunoToProfessor: (data: Partial<AppDataContextType>) => void;
+  reloadData: () => Promise<void>;
+  debugStorage: () => Promise<void>;
 }
 
 const AppDataContext = createContext<AppDataContextType | undefined>(undefined);
@@ -248,56 +249,157 @@ export function AppDataProvider({ children }: { children: ReactNode }) {
   const [players, setPlayers] = useState<Player[]>([]);
   const [events, setEvents] = useState<Event[]>([]);
   const [isLoading, setIsLoading] = useState(true);
-  const { notifyEvent, notifyStats, notifyGuidance, showNotification } = useNotifications();
+  const [lastLoadTime, setLastLoadTime] = useState(0);
 
-  // Carregar dados do AsyncStorage
-  useEffect(() => {
-    const loadData = async () => {
-      try {
-        const storedTeams = await AsyncStorage.getItem('@GestaoTimes:teams');
-        const storedPlayers = await AsyncStorage.getItem('@GestaoTimes:players');
-        const storedEvents = await AsyncStorage.getItem('@GestaoTimes:events');
-
-        if (storedTeams) setTeams(JSON.parse(storedTeams));
-        if (storedPlayers) setPlayers(JSON.parse(storedPlayers));
-        if (storedEvents) setEvents(JSON.parse(storedEvents));
-      } catch (error) {
-        console.error('Erro ao carregar dados:', error);
-        setTeams([]);
-        setPlayers([]);
-        setEvents([]);
-      } finally {
-        setIsLoading(false);
+  // Função de debug para verificar dados no AsyncStorage
+  const debugStorage = async () => {
+    try {
+      console.log('🔍 === DEBUG STORAGE ===');
+      
+      const allKeys = await AsyncStorage.getAllKeys();
+      console.log('📋 Todas as chaves no AsyncStorage:', allKeys);
+      
+      const teamsData = await AsyncStorage.getItem('@GestaoTimes:teams');
+      const playersData = await AsyncStorage.getItem('@GestaoTimes:players');
+      const eventsData = await AsyncStorage.getItem('@GestaoTimes:events');
+      const usersData = await AsyncStorage.getItem('@GestaoTimes:users');
+      const currentUser = await AsyncStorage.getItem('@GestaoTimes:user');
+      
+      console.log('🏆 Teams raw data:', teamsData);
+      console.log('👥 Players raw data:', playersData);
+      console.log('📅 Events raw data:', eventsData);
+      console.log('👤 Users raw data:', usersData);
+      console.log('🔐 Current user:', currentUser);
+      
+      if (teamsData) {
+        const teams = JSON.parse(teamsData);
+        console.log('🏆 Teams parsed:', teams.length, teams);
       }
-    };
+      
+      if (playersData) {
+        const players = JSON.parse(playersData);
+        console.log('👥 Players parsed:', players.length, players);
+      }
+      
+      console.log('🔍 === FIM DEBUG ===');
+    } catch (error) {
+      console.error('❌ Erro no debug:', error);
+    }
+  };
 
-    loadData();
+  // Carregar dados do AsyncStorage com controle de frequência
+  const loadData = async (force = false) => {
+    try {
+      const now = Date.now();
+      
+      // Evitar recarregamentos muito frequentes (menos de 1 segundo)
+      if (!force && now - lastLoadTime < 1000) {
+        console.log('⏭️ Pulando recarregamento (muito recente)');
+        return;
+      }
+      
+      console.log('📊 Carregando dados do AppDataContext...');
+      setLastLoadTime(now);
+      
+      const storedTeams = await AsyncStorage.getItem('@GestaoTimes:teams');
+      const storedPlayers = await AsyncStorage.getItem('@GestaoTimes:players');
+      const storedEvents = await AsyncStorage.getItem('@GestaoTimes:events');
+
+      const teamsData = storedTeams ? JSON.parse(storedTeams) : [];
+      const playersData = storedPlayers ? JSON.parse(storedPlayers) : [];
+      const eventsData = storedEvents ? JSON.parse(storedEvents) : [];
+
+      console.log('📊 Dados carregados do storage:', {
+        teams: teamsData.length,
+        players: playersData.length,
+        events: eventsData.length
+      });
+
+      console.log('📊 Estado atual antes da atualização:', {
+        teams: teams.length,
+        players: players.length,
+        events: events.length
+      });
+
+      // Só atualizar se os dados realmente mudaram
+      if (JSON.stringify(teamsData) !== JSON.stringify(teams)) {
+        console.log('🔄 Atualizando teams');
+        setTeams(teamsData);
+      }
+      
+      if (JSON.stringify(playersData) !== JSON.stringify(players)) {
+        console.log('🔄 Atualizando players');
+        setPlayers(playersData);
+      }
+      
+      if (JSON.stringify(eventsData) !== JSON.stringify(events)) {
+        console.log('🔄 Atualizando events');
+        setEvents(eventsData);
+      }
+
+    } catch (error) {
+      console.error('❌ Erro ao carregar dados:', error);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  // Carregar dados iniciais
+  useEffect(() => {
+    loadData(true);
   }, []);
 
-  // Funções de adição
-  const addTeam = useCallback(async (team: Omit<Team, 'id' | 'createdAt'>) => {
+  // Função para recarregar dados com controle
+  const reloadData = useCallback(async (force = false) => {
+    console.log('🔄 Recarregando dados...', force ? '(forçado)' : '');
+    await loadData(force);
+  }, [lastLoadTime]);
+
+  // Funções de adição com melhor persistência
+  const addTeam = async (team: Omit<Team, 'id' | 'createdAt'>) => {
     try {
+      console.log('🏆 Tentando adicionar time:', team);
+      
+      // Verifica se já existe um time com o mesmo nome
+      const teamExists = teams.some(t => t.name.toLowerCase() === team.name.toLowerCase());
+      if (teamExists) {
+        throw new Error('Já existe um time com este nome.');
+      }
+
       const newTeam: Team = {
         ...team,
-        id: uuid(),
+        id: `team-${uuid()}`,
         createdAt: new Date().toISOString(),
       };
 
+      console.log('🏆 Novo time criado:', newTeam);
+
+      // Atualiza o estado local primeiro
       const updatedTeams = [...teams, newTeam];
       setTeams(updatedTeams);
+
+      // Salva no AsyncStorage
       await AsyncStorage.setItem('@GestaoTimes:teams', JSON.stringify(updatedTeams));
-      showNotification('Time adicionado com sucesso!');
+      
+      // Verifica se foi salvo corretamente
+      const savedData = await AsyncStorage.getItem('@GestaoTimes:teams');
+      console.log('✅ Time salvo no AsyncStorage:', savedData ? JSON.parse(savedData).length : 0, 'times');
+
     } catch (error) {
-      console.error('Erro ao adicionar time:', error);
-      showNotification('Erro ao adicionar time', 'error');
+      console.error('❌ Erro ao criar time:', error);
+      // Reverte o estado em caso de erro
+      setTeams(teams);
+      throw error;
     }
-  }, [teams, showNotification]);
+  };
 
   const addPlayer = useCallback(async (player: Omit<Player, 'id'>) => {
     try {
+      console.log('👥 Tentando adicionar jogador:', player.name);
+      
       const newPlayer: Player = {
         ...player,
-        id: uuid(),
+        id: `player-${uuid()}`,
         createdAt: new Date().toISOString(),
         updatedAt: new Date().toISOString(),
         stats: {
@@ -307,19 +409,35 @@ export function AppDataProvider({ children }: { children: ReactNode }) {
           cards: 0,
         },
         profile: {
-          age: player.profile?.age || 0,
+          age: player.profile?.age || 18,
         },
       };
 
+      // Atualizar estado local primeiro
       const updatedPlayers = [...players, newPlayer];
       setPlayers(updatedPlayers);
+      
+      console.log('👥 Estado local atualizado, salvando no AsyncStorage...');
+
+      // Salvar no AsyncStorage
       await AsyncStorage.setItem('@GestaoTimes:players', JSON.stringify(updatedPlayers));
-      showNotification('Jogador adicionado com sucesso!');
+      
+      // Verificar se foi salvo
+      const savedData = await AsyncStorage.getItem('@GestaoTimes:players');
+      const savedPlayers = savedData ? JSON.parse(savedData) : [];
+      
+      console.log('✅ Jogador salvo:', {
+        nome: newPlayer.name,
+        totalNoStorage: savedPlayers.length,
+        totalNoEstado: updatedPlayers.length
+      });
+
     } catch (error) {
-      console.error('Erro ao adicionar jogador:', error);
-      showNotification('Erro ao adicionar jogador', 'error');
+      console.error('❌ Erro ao adicionar jogador:', error);
+      // Reverter estado em caso de erro
+      await reloadData(true);
     }
-  }, [players, showNotification]);
+  }, [players]);
 
   const addEvent = useCallback(async (event: Omit<Event, 'id' | 'createdAt'>) => {
     try {
@@ -332,13 +450,55 @@ export function AppDataProvider({ children }: { children: ReactNode }) {
       const updatedEvents = [...events, newEvent];
       setEvents(updatedEvents);
       await AsyncStorage.setItem('@GestaoTimes:events', JSON.stringify(updatedEvents));
-      notifyEvent(newEvent);
-      showNotification('Evento adicionado com sucesso!');
+      console.log('Evento adicionado com sucesso!');
     } catch (error) {
       console.error('Erro ao adicionar evento:', error);
-      showNotification('Erro ao adicionar evento', 'error');
     }
-  }, [events, notifyEvent, showNotification]);
+  }, [events]);
+
+  const addGuidance = useCallback(async (playerId: string, guidance: Omit<Guidance, 'id'>) => {
+    try {
+      console.log('Adicionando orientação para jogador:', playerId);
+      // Implementação futura para orientações
+    } catch (error) {
+      console.error('Erro ao adicionar orientação:', error);
+    }
+  }, []);
+
+  const addPlayerStats = useCallback(async (playerId: string, stats: Record<string, number>) => {
+    try {
+      const updatedPlayers = players.map(p => 
+        p.id === playerId 
+          ? { ...p, stats: { ...p.stats, ...stats }, updatedAt: new Date().toISOString() }
+          : p
+      );
+      setPlayers(updatedPlayers);
+      await AsyncStorage.setItem('@GestaoTimes:players', JSON.stringify(updatedPlayers));
+      console.log('Estatísticas do jogador atualizadas!');
+    } catch (error) {
+      console.error('Erro ao atualizar estatísticas:', error);
+    }
+  }, [players]);
+
+  const syncProfessorToAluno = useCallback((data: Partial<AppDataContextType>) => {
+    try {
+      if (data.teams) setTeams(data.teams);
+      if (data.players) setPlayers(data.players);
+      if (data.events) setEvents(data.events);
+      console.log('Dados sincronizados do professor para aluno');
+    } catch (error) {
+      console.error('Erro na sincronização professor->aluno:', error);
+    }
+  }, []);
+
+  const syncAlunoToProfessor = useCallback((data: Partial<AppDataContextType>) => {
+    try {
+      console.log('Sincronizando dados do aluno para professor');
+      // Implementação futura para sincronização
+    } catch (error) {
+      console.error('Erro na sincronização aluno->professor:', error);
+    }
+  }, []);
 
   // Funções de atualização
   const updateTeam = useCallback(async (id: string, team: Partial<Team>) => {
@@ -346,24 +506,22 @@ export function AppDataProvider({ children }: { children: ReactNode }) {
       const updatedTeams = teams.map(t => t.id === id ? { ...t, ...team } : t);
       setTeams(updatedTeams);
       await AsyncStorage.setItem('@GestaoTimes:teams', JSON.stringify(updatedTeams));
-      showNotification('Time atualizado com sucesso!');
+      console.log('Time atualizado com sucesso!');
     } catch (error) {
       console.error('Erro ao atualizar time:', error);
-      showNotification('Erro ao atualizar time', 'error');
     }
-  }, [teams, showNotification]);
+  }, [teams]);
 
   const updatePlayer = useCallback(async (id: string, player: Partial<Player>) => {
     try {
       const updatedPlayers = players.map(p => p.id === id ? { ...p, ...player, updatedAt: new Date().toISOString() } : p);
       setPlayers(updatedPlayers);
       await AsyncStorage.setItem('@GestaoTimes:players', JSON.stringify(updatedPlayers));
-      showNotification('Jogador atualizado com sucesso!');
+      console.log('Jogador atualizado com sucesso!');
     } catch (error) {
       console.error('Erro ao atualizar jogador:', error);
-      showNotification('Erro ao atualizar jogador', 'error');
     }
-  }, [players, showNotification]);
+  }, [players]);
 
   // Funções de remoção
   const deleteTeam = useCallback(async (id: string) => {
@@ -371,24 +529,22 @@ export function AppDataProvider({ children }: { children: ReactNode }) {
       const updatedTeams = teams.filter(t => t.id !== id);
       setTeams(updatedTeams);
       await AsyncStorage.setItem('@GestaoTimes:teams', JSON.stringify(updatedTeams));
-      showNotification('Time removido com sucesso!');
+      console.log('Time removido com sucesso!');
     } catch (error) {
       console.error('Erro ao remover time:', error);
-      showNotification('Erro ao remover time', 'error');
     }
-  }, [teams, showNotification]);
+  }, [teams]);
 
   const deletePlayer = useCallback(async (id: string) => {
     try {
       const updatedPlayers = players.filter(p => p.id !== id);
       setPlayers(updatedPlayers);
       await AsyncStorage.setItem('@GestaoTimes:players', JSON.stringify(updatedPlayers));
-      showNotification('Jogador removido com sucesso!');
+      console.log('Jogador removido com sucesso!');
     } catch (error) {
       console.error('Erro ao remover jogador:', error);
-      showNotification('Erro ao remover jogador', 'error');
     }
-  }, [players, showNotification]);
+  }, [players]);
 
   // Funções de utilidade
   const getPlayersByTeam = useCallback((teamId: string) => {
@@ -440,6 +596,8 @@ export function AppDataProvider({ children }: { children: ReactNode }) {
     addTeam,
     addPlayer,
     addEvent,
+    addGuidance,
+    addPlayerStats,
     updateTeam,
     updatePlayer,
     deleteTeam,
@@ -451,7 +609,11 @@ export function AppDataProvider({ children }: { children: ReactNode }) {
     getEventsBySport,
     getTodayEvents,
     getUpcomingEvents,
-    getStats
+    getStats,
+    syncProfessorToAluno,
+    syncAlunoToProfessor,
+    reloadData,
+    debugStorage,
   };
 
   if (isLoading) {

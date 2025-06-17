@@ -9,13 +9,16 @@ import {
   Dimensions,
   Animated,
 } from 'react-native';
-import { Text, Card, Button, Portal, Dialog, Chip, PaperProvider, MD3LightTheme, Avatar, Surface, useTheme, Menu, Divider } from 'react-native-paper';
+import { Text, Card, Button, Portal, Dialog, Chip, PaperProvider, MD3LightTheme, Avatar, Surface, useTheme, Menu, Divider, FAB } from 'react-native-paper';
 import { Stack } from 'expo-router';
 import { Ionicons, MaterialCommunityIcons, FontAwesome5 } from '@expo/vector-icons';
 import { useAppData } from '../../contexts/AppDataContext';
+import { useAuth } from '../../contexts/AuthContext';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { LinearGradient } from 'expo-linear-gradient';
 import { BlurView } from 'expo-blur';
+import { AddPlayerModal } from '../../components/AddPlayerModal';
+import { useFocusEffect } from '@react-navigation/native';
 
 // Comandos de feedback pré-prontos
 const COMANDOS_FEEDBACK = [
@@ -60,13 +63,14 @@ interface Jogador {
   teamId: string;
   createdAt: string;
   updatedAt: string;
-  stats: {
+  feedbacks?: Feedback[];
+  stats?: {
     goals: number;
     assists: number;
     games: number;
     cards: number;
   };
-  profile: {
+  profile?: {
     age: number;
     height?: string;
     weight?: string;
@@ -76,17 +80,32 @@ interface Jogador {
 
 export default function JogadoresScreen() {
   const theme = useTheme();
-  const { players, teams, updatePlayer } = useAppData();
+  const { players, teams, updatePlayer, reloadData, addPlayer, debugStorage } = useAppData();
+  const { user } = useAuth();
   const [busca, setBusca] = useState('');
   const [timeFiltro, setTimeFiltro] = useState('');
   const [esporteFiltro, setEsporteFiltro] = useState('');
   const [posicaoFiltro, setPosicaoFiltro] = useState('');
-  const [jogadorSelecionado, setJogadorSelecionado] = useState<any>(null);
+  const [jogadorSelecionado, setJogadorSelecionado] = useState<Jogador | null>(null);
   const [showModal, setShowModal] = useState(false);
   const [showRelatorios, setShowRelatorios] = useState(false);
   const [feedbacks, setFeedbacks] = useState<Record<string, Feedback[]>>({});
   const [menuVisible, setMenuVisible] = useState(false);
+  const [showAddPlayerModal, setShowAddPlayerModal] = useState(false);
   const scrollY = new Animated.Value(0);
+
+  // Recarregar dados quando a tela ganha foco (mas não muito frequentemente)
+  useFocusEffect(
+    React.useCallback(() => {
+      console.log('🔄 Tela Jogadores ganhou foco');
+      // Aguardar um pouco antes de recarregar para evitar conflitos
+      const timeoutId = setTimeout(() => {
+        reloadData(false); // Não forçar recarregamento
+      }, 500);
+      
+      return () => clearTimeout(timeoutId);
+    }, [])
+  );
 
   // Limpar dados fictícios ao iniciar
   React.useEffect(() => {
@@ -153,30 +172,35 @@ export default function JogadoresScreen() {
     });
   }, [players, busca, timeFiltro, esporteFiltro, posicaoFiltro]);
 
-  // Adiciona feedback ao jogador
-  const adicionarFeedback = async (mensagem: string) => {
-    if (!jogadorSelecionado) return;
+  const jogadoresSemTime = useMemo(() => {
+    return players.filter(j => !j.teamId || j.teamId === '');
+  }, [players]);
+
+  const enviarFeedback = async (mensagem: string) => {
+    if (!jogadorSelecionado || !user) return;
 
     const novoFeedback: Feedback = {
       mensagem,
-      data: new Date().toLocaleDateString(),
-      professor: 'Professor', // Substituir pelo nome real do professor
+      data: new Date().toISOString(),
+      professor: user.name || 'Professor',
     };
 
-    const novosFeedbacks = {
-      ...feedbacks,
-      [jogadorSelecionado.id]: [
-        ...(feedbacks[jogadorSelecionado.id] || []),
-        novoFeedback,
-      ],
+    const feedbacksAtualizados = [
+      ...(jogadorSelecionado.feedbacks || []),
+      novoFeedback,
+    ];
+
+    const jogadorAtualizado = {
+      ...jogadorSelecionado,
+      feedbacks: feedbacksAtualizados,
     };
 
     try {
-      await AsyncStorage.setItem('feedbacks', JSON.stringify(novosFeedbacks));
-      setFeedbacks(novosFeedbacks);
+      await updatePlayer(jogadorSelecionado.id, jogadorAtualizado);
+      setJogadorSelecionado(jogadorAtualizado);
       setShowModal(false);
     } catch (error) {
-      console.error('Erro ao salvar feedback:', error);
+      console.error('Erro ao enviar feedback:', error);
     }
   };
 
@@ -191,6 +215,62 @@ export default function JogadoresScreen() {
     outputRange: [1, 0.95],
     extrapolate: 'clamp',
   });
+
+  const getTeamName = (teamId: string) => {
+    const team = teams.find(t => t.id === teamId);
+    return team ? team.name : 'Sem time';
+  };
+
+  const getSportColor = (sport: string) => {
+    switch (sport?.toLowerCase()) {
+      case 'futebol': return '#4CAF50';
+      case 'volei': case 'vôlei': return '#FF9800';
+      case 'basquete': return '#FF5722';
+      case 'futsal': return '#2196F3';
+      case 'handebol': return '#9C27B0';
+      default: return '#666';
+    }
+  };
+
+  const handleRefresh = async () => {
+    console.log('🔄 Refresh manual dos dados de jogadores...');
+    await reloadData(true);
+  };
+
+  const handleTestPlayer = async () => {
+    try {
+      console.log('🧪 Criando jogador de teste...');
+      const testPlayer = {
+        name: `Jogador Teste ${Date.now()}`,
+        sport: 'futebol',
+        position: 'Atacante',
+        teamId: '',
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+        stats: {
+          goals: 0,
+          assists: 0,
+          games: 0,
+          cards: 0,
+        },
+        profile: {
+          age: 20,
+        },
+      };
+      
+      await addPlayer(testPlayer);
+      console.log('✅ Jogador de teste criado');
+      
+      // Aguardar e verificar se ainda está lá
+      setTimeout(async () => {
+        console.log('🔍 Verificando se jogador ainda existe...');
+        await debugStorage();
+      }, 2000);
+      
+    } catch (error) {
+      console.error('❌ Erro ao criar jogador de teste:', error);
+    }
+  };
 
   return (
     <PaperProvider theme={MD3LightTheme}>
@@ -365,7 +445,7 @@ export default function JogadoresScreen() {
                         <Avatar.Text 
                           size={45} 
                           label={jogador.name.split(' ').map(n => n[0]).join('')} 
-                          style={styles.avatar}
+                          style={{ backgroundColor: getSportColor(jogador.sport) }}
                           labelStyle={styles.avatarLabel}
                         />
                         <View style={styles.jogadorDetalhes}>
@@ -429,6 +509,14 @@ export default function JogadoresScreen() {
           </Animated.ScrollView>
         </View>
 
+        {/* FAB para adicionar jogador */}
+        <FAB
+          icon="plus"
+          style={styles.fab}
+          onPress={() => setShowAddPlayerModal(true)}
+          label="Adicionar Jogador"
+        />
+
         {/* Modal de Feedback */}
         <Portal>
           <Dialog
@@ -446,16 +534,13 @@ export default function JogadoresScreen() {
               <Dialog.Content>
                 <ScrollView style={styles.comandosContainer}>
                   {COMANDOS_FEEDBACK.map((comando, index) => (
-                    <Button
+                    <Chip
                       key={index}
-                      mode="outlined"
-                      onPress={() => adicionarFeedback(comando)}
+                      onPress={() => enviarFeedback(comando)}
                       style={styles.comandoButton}
-                      icon="message-text"
-                      contentStyle={styles.comandoButtonContent}
                     >
                       {comando}
-                    </Button>
+                    </Chip>
                   ))}
                 </ScrollView>
 
@@ -514,6 +599,11 @@ export default function JogadoresScreen() {
             </BlurView>
           </Dialog>
         </Portal>
+
+        <AddPlayerModal 
+          visible={showAddPlayerModal} 
+          onClose={() => setShowAddPlayerModal(false)} 
+        />
       </SafeAreaView>
     </PaperProvider>
   );
@@ -523,7 +613,8 @@ export default function JogadoresScreen() {
 function getSportIcon(sport: string): string {
   if (!sport) return 'question';
   
-  switch (sport.toLowerCase()) {
+  const sportLower = sport.toLowerCase();
+  switch (sportLower) {
     case 'futebol':
       return 'futbol';
     case 'volei':
@@ -733,9 +824,6 @@ const styles = StyleSheet.create({
     marginBottom: 8,
     borderRadius: 8,
   },
-  comandoButtonContent: {
-    paddingVertical: 8,
-  },
   verRelatoriosButton: {
     marginTop: 16,
     borderRadius: 8,
@@ -779,5 +867,28 @@ const styles = StyleSheet.create({
   menuContent: {
     backgroundColor: '#fff',
     borderRadius: 8,
+  },
+  fab: {
+    position: 'absolute',
+    margin: 16,
+    right: 0,
+    bottom: 0,
+    backgroundColor: '#0066FF',
+  },
+  headerTop: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+  },
+  headerButtons: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  testButton: {
+    padding: 5,
+  },
+  refreshButton: {
+    padding: 5,
   },
 }); 

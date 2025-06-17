@@ -67,13 +67,17 @@ export function AddTeamModal({ visible, onClose }: AddTeamModalProps) {
         draws: 0,
       });
       
-      Alert.alert('Sucesso!', 'Time criado com sucesso!');
+      // Limpa o formulário e fecha o modal
       setName('');
       setSelectedSport('');
       onClose();
     } catch (error) {
       console.error('Erro ao criar time:', error);
-      Alert.alert('Erro', 'Não foi possível criar o time.');
+      Alert.alert(
+        'Erro ao criar time',
+        error instanceof Error ? error.message : 'Não foi possível criar o time. Por favor, tente novamente.',
+        [{ text: 'OK' }]
+      );
     } finally {
       setLoading(false);
     }

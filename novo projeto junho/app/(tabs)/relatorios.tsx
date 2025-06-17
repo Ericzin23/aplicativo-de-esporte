@@ -5,28 +5,25 @@ import {
   StyleSheet,
   ScrollView,
   SafeAreaView,
-  TouchableOpacity,
-  Dimensions,
-  Share,
   ActivityIndicator,
+  Alert,
+  TouchableOpacity,
 } from 'react-native';
-import { Stack } from 'expo-router';
 import { useAppData } from '../../contexts/AppDataContext';
-import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
-import { LineChart, BarChart, PieChart } from 'react-native-chart-kit';
-import { Card, Divider, List, Button } from 'react-native-paper';
-import AsyncStorage from '@react-native-async-storage/async-storage';
-import * as FileSystem from 'expo-file-system';
+import { Card, Divider, Button } from 'react-native-paper';
 import * as Sharing from 'expo-sharing';
+import * as FileSystem from 'expo-file-system';
+import { printToFileAsync } from 'expo-print';
 
 export default function RelatoriosScreen() {
-  const { 
-    teams = [], 
-    players = [], 
+  const {
+    teams = [],
+    players = [],
     events = [],
     getPlayersByTeam,
-    getStats
+    getStats,
   } = useAppData();
+
   const [loading, setLoading] = useState(true);
   const [relatorioData, setRelatorioData] = useState<any>(null);
 
@@ -38,38 +35,33 @@ export default function RelatoriosScreen() {
     try {
       setLoading(true);
 
-      // Estatísticas gerais
       const stats = getStats();
       const totalTimes = stats.totalTeams;
       const totalJogadores = stats.totalPlayers;
       const totalEventos = events.length;
 
-      // Estatísticas por esporte
       const esportes = teams.reduce((acc: any, team) => {
         const sport = team.sport || 'Não definido';
         acc[sport] = (acc[sport] || 0) + 1;
         return acc;
       }, {});
 
-      // Estatísticas de jogadores por time
       const jogadoresPorTime = teams.map(team => ({
         id: team.id,
         name: team.name,
         count: getPlayersByTeam(team.id).length
       }));
 
-      // Estatísticas de gols e assistências
       const estatisticasJogadores = players.map(player => {
-        // Garantir que o objeto stats existe e tem valores padrão
         const defaultStats = {
           goals: 0,
           assists: 0,
           games: 0,
           cards: 0
         };
-        
+
         const playerStats = player.stats || defaultStats;
-        
+
         return {
           id: player.id,
           name: player.name,
@@ -78,12 +70,19 @@ export default function RelatoriosScreen() {
         };
       });
 
-      // Eventos por mês
       const eventosPorMes = events.reduce((acc: any, event) => {
         const mes = new Date(event.date).getMonth();
         acc[mes] = (acc[mes] || 0) + 1;
         return acc;
       }, {});
+
+      const feedbacksJogadores = players
+        .filter(p => p.feedbacks && p.feedbacks.length > 0)
+        .map(p => ({
+          id: p.id,
+          name: p.name,
+          feedbacks: p.feedbacks.sort((a, b) => new Date(b.data).getTime() - new Date(a.data).getTime())
+        }));
 
       setRelatorioData({
         totalTimes,
@@ -92,10 +91,11 @@ export default function RelatoriosScreen() {
         esportes,
         jogadoresPorTime,
         estatisticasJogadores,
-        eventosPorMes
+        eventosPorMes,
+        feedbacksJogadores
       });
     } catch (error) {
-      console.error('Erro ao gerar relatório:', error);
+      Alert.alert('Erro ao gerar relatório', error.message);
     } finally {
       setLoading(false);
     }
@@ -103,223 +103,175 @@ export default function RelatoriosScreen() {
 
   const exportarRelatorio = async () => {
     try {
-      const message = `
-        Relatório de Estatísticas
-        
-        Times: ${relatorioData?.totalTimes || 0}
-        Jogadores: ${relatorioData?.totalJogadores || 0}
-        Eventos: ${relatorioData?.totalEventos || 0}
-        
-        Top Jogadores:
-        ${(relatorioData?.estatisticasJogadores || [])
-          .sort((a: any, b: any) => (b.goals || 0) - (a.goals || 0))
-          .slice(0, 5)
-          .map((j: any) => `${j.name}: ${j.goals || 0} gols, ${j.assists || 0} assistências`)
-          .join('\n')}
+      const htmlContent = `
+        <html>
+          <head>
+            <style>
+              body { font-family: Arial, sans-serif; margin: 20px; }
+              h1 { color: #0066FF; }
+              h2 { color: #333; margin-top: 30px; }
+              .stats { background: #f5f5f5; padding: 15px; border-radius: 8px; margin: 10px 0; }
+              .feedback { border-left: 3px solid #0066FF; padding-left: 10px; margin: 10px 0; }
+              .professor { font-weight: bold; color: #0066FF; }
+              .data { font-size: 12px; color: #666; }
+            </style>
+          </head>
+          <body>
+            <h1>Relatório Geral - Gestão de Times</h1>
+            
+            <div class="stats">
+              <h2>Estatísticas Gerais</h2>
+              <p><strong>Times:</strong> ${relatorioData.totalTimes}</p>
+              <p><strong>Jogadores:</strong> ${relatorioData.totalJogadores}</p>
+              <p><strong>Eventos:</strong> ${relatorioData.totalEventos}</p>
+            </div>
+
+            <h2>Feedbacks dos Jogadores</h2>
+            ${relatorioData.feedbacksJogadores.map(jogador => `
+              <h3>${jogador.name}</h3>
+              ${jogador.feedbacks.map(fb => `
+                <div class="feedback">
+                  <div class="professor">${fb.professor}</div>
+                  <div>${fb.mensagem}</div>
+                  <div class="data">${new Date(fb.data).toLocaleString()}</div>
+                </div>
+              `).join('')}
+            `).join('')}
+
+            <div style="margin-top: 30px; font-size: 12px; color: #666;">
+              Relatório gerado em: ${new Date().toLocaleString()}
+            </div>
+          </body>
+        </html>
       `;
 
-      await Share.share({
-        message,
-        title: 'Relatório de Estatísticas'
-      });
+      const { uri } = await printToFileAsync({ html: htmlContent });
+      await Sharing.shareAsync(uri);
+
     } catch (error) {
-      console.error('Erro ao exportar relatório:', error);
+      Alert.alert('Erro ao exportar relatório', error.message);
     }
   };
 
-  return (
-    <SafeAreaView style={styles.container}>
-      <Stack.Screen 
-        options={{ 
-          title: 'Relatórios',
-          headerRight: () => (
-            <TouchableOpacity onPress={exportarRelatorio}>
-              <Ionicons name="download-outline" size={24} color="#0066FF" />
-            </TouchableOpacity>
-          )
-        }} 
-      />
-
-      {loading ? (
-        <View style={styles.loadingContainer}>
-          <ActivityIndicator size="large" color="#0066FF" />
-        </View>
-      ) : (
-        <ScrollView style={styles.content}>
-          {/* Estatísticas Gerais */}
-          <Card style={styles.card}>
-            <Card.Title title="Estatísticas Gerais" />
-            <Card.Content>
-              <View style={styles.statsGrid}>
-                <View style={styles.statItem}>
-                  <MaterialCommunityIcons name="account-group" size={24} color="#0066FF" />
-                  <Text style={styles.statValue}>{relatorioData?.totalTimes || 0}</Text>
-                  <Text style={styles.statLabel}>Times</Text>
-                </View>
-                <View style={styles.statItem}>
-                  <MaterialCommunityIcons name="account" size={24} color="#0066FF" />
-                  <Text style={styles.statValue}>{relatorioData?.totalJogadores || 0}</Text>
-                  <Text style={styles.statLabel}>Jogadores</Text>
-                </View>
-                <View style={styles.statItem}>
-                  <MaterialCommunityIcons name="calendar" size={24} color="#0066FF" />
-                  <Text style={styles.statValue}>{relatorioData?.totalEventos || 0}</Text>
-                  <Text style={styles.statLabel}>Eventos</Text>
-                </View>
-              </View>
-            </Card.Content>
-          </Card>
-
-          {/* Gráfico de Esportes */}
-          <Card style={styles.card}>
-            <Card.Title title="Times por Esporte" />
-            <Card.Content>
-              <PieChart
-                data={Object.entries(relatorioData?.esportes || {}).map(([key, value], index) => ({
-                  name: key,
-                  population: value as number,
-                  color: getRandomColor(),
-                  legendFontColor: '#7F7F7F',
-                  legendFontSize: 12,
-                  key: `sport-${key}-${index}-${Date.now()}`
-                }))}
-                width={Dimensions.get('window').width - 40}
-                height={220}
-                chartConfig={{
-                  backgroundColor: '#ffffff',
-                  backgroundGradientFrom: '#ffffff',
-                  backgroundGradientTo: '#ffffff',
-                  color: (opacity = 1) => `rgba(0, 102, 255, ${opacity})`,
-                }}
-                accessor="population"
-                backgroundColor="transparent"
-                paddingLeft="15"
-              />
-            </Card.Content>
-          </Card>
-
-          {/* Gráfico de Jogadores por Time */}
-          <Card style={styles.card}>
-            <Card.Title title="Jogadores por Time" />
-            <Card.Content>
-              <BarChart
-                data={{
-                  labels: (relatorioData?.jogadoresPorTime || []).map((t: any) => t.name),
-                  datasets: [{
-                    data: (relatorioData?.jogadoresPorTime || []).map((t: any) => t.count)
-                  }]
-                }}
-                width={Dimensions.get('window').width - 40}
-                height={220}
-                chartConfig={{
-                  backgroundColor: '#ffffff',
-                  backgroundGradientFrom: '#ffffff',
-                  backgroundGradientTo: '#ffffff',
-                  color: (opacity = 1) => `rgba(0, 102, 255, ${opacity})`,
-                }}
-                style={styles.chart}
-              />
-            </Card.Content>
-          </Card>
-
-          {/* Top Jogadores */}
-          <Card style={styles.card}>
-            <Card.Title title="Top Jogadores" />
-            <Card.Content>
-              <List.Section>
-                {(relatorioData?.estatisticasJogadores || [])
-                  .sort((a: any, b: any) => (b.goals || 0) - (a.goals || 0))
-                  .slice(0, 5)
-                  .map((jogador: any) => (
-                    <List.Item
-                      key={`player-${jogador.id}`}
-                      title={jogador.name}
-                      description={`${jogador.goals || 0} gols • ${jogador.assists || 0} assistências`}
-                      left={props => <List.Icon {...props} icon="trophy" />}
-                    />
-                  ))}
-              </List.Section>
-            </Card.Content>
-          </Card>
-
-          {/* Eventos por Mês */}
-          <Card style={styles.card}>
-            <Card.Title title="Eventos por Mês" />
-            <Card.Content>
-              <LineChart
-                data={{
-                  labels: ['Jan', 'Fev', 'Mar', 'Abr', 'Mai', 'Jun', 'Jul', 'Ago', 'Set', 'Out', 'Nov', 'Dez'],
-                  datasets: [{
-                    data: Object.values(relatorioData?.eventosPorMes || {})
-                  }]
-                }}
-                width={Dimensions.get('window').width - 40}
-                height={220}
-                chartConfig={{
-                  backgroundColor: '#ffffff',
-                  backgroundGradientFrom: '#ffffff',
-                  backgroundGradientTo: '#ffffff',
-                  color: (opacity = 1) => `rgba(0, 102, 255, ${opacity})`,
-                }}
-                style={styles.chart}
-              />
-            </Card.Content>
-          </Card>
-        </ScrollView>
-      )}
-    </SafeAreaView>
-  );
-}
-
-// Função auxiliar para gerar cores aleatórias
-function getRandomColor() {
-  const letters = '0123456789ABCDEF';
-  let color = '#';
-  for (let i = 0; i < 6; i++) {
-    color += letters[Math.floor(Math.random() * 16)];
+  if (loading || !relatorioData) {
+    return (
+      <SafeAreaView style={styles.loadingContainer}>
+        <ActivityIndicator size="large" color="#0066FF" />
+      </SafeAreaView>
+    );
   }
-  return color;
+
+  return (
+    <ScrollView style={styles.container}>
+      <Text style={styles.title}>Relatório Geral</Text>
+
+      <Card style={styles.card}>
+        <Card.Title title="Times" />
+        <Card.Content>
+          <Text style={styles.statValue}>{relatorioData.totalTimes}</Text>
+        </Card.Content>
+      </Card>
+
+      <Card style={styles.card}>
+        <Card.Title title="Jogadores" />
+        <Card.Content>
+          <Text style={styles.statValue}>{relatorioData.totalJogadores}</Text>
+        </Card.Content>
+      </Card>
+
+      <Card style={styles.card}>
+        <Card.Title title="Eventos" />
+        <Card.Content>
+          <Text style={styles.statValue}>{relatorioData.totalEventos}</Text>
+        </Card.Content>
+      </Card>
+
+      <Text style={styles.subtitle}>Feedbacks dos Jogadores</Text>
+      {relatorioData.feedbacksJogadores.map((jogador: any) => (
+        <Card key={jogador.id} style={styles.card}>
+          <Card.Title title={jogador.name} />
+          <Card.Content>
+            {jogador.feedbacks.map((fb: any, idx: number) => (
+              <View key={idx} style={styles.feedbackItem}>
+                <Text style={styles.professorName}>{fb.professor}</Text>
+                <Text style={styles.feedbackMessage}>{fb.mensagem}</Text>
+                <Text style={styles.feedbackDate}>
+                  {new Date(fb.data).toLocaleString()}
+                </Text>
+                <Divider style={styles.divider} />
+              </View>
+            ))}
+          </Card.Content>
+        </Card>
+      ))}
+
+      <Button 
+        mode="contained" 
+        style={styles.exportButton} 
+        onPress={exportarRelatorio}
+        icon="download"
+      >
+        Exportar Relatório
+      </Button>
+    </ScrollView>
+  );
 }
 
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#f5f5f5',
+    padding: 16,
+    backgroundColor: '#fff',
   },
   loadingContainer: {
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
   },
-  content: {
-    flex: 1,
-    padding: 16,
-  },
-  card: {
-    marginBottom: 16,
-    elevation: 2,
-  },
-  statsGrid: {
-    flexDirection: 'row',
-    justifyContent: 'space-around',
-    marginTop: 8,
-  },
-  statItem: {
-    alignItems: 'center',
-  },
-  statValue: {
+  title: {
     fontSize: 24,
     fontWeight: 'bold',
-    color: '#0066FF',
-    marginTop: 4,
+    marginBottom: 16,
+    color: '#333',
   },
-  statLabel: {
+  subtitle: {
+    fontSize: 18,
+    fontWeight: 'bold',
+    marginVertical: 12,
+    color: '#333',
+  },
+  card: {
+    marginBottom: 12,
+    elevation: 2,
+  },
+  statValue: {
+    fontSize: 32,
+    fontWeight: 'bold',
+    color: '#0066FF',
+    textAlign: 'center',
+  },
+  feedbackItem: {
+    marginBottom: 8,
+  },
+  professorName: {
+    fontWeight: 'bold',
+    color: '#0066FF',
+    fontSize: 14,
+  },
+  feedbackMessage: {
+    fontSize: 14,
+    color: '#333',
+    marginVertical: 4,
+  },
+  feedbackDate: {
     fontSize: 12,
     color: '#666',
-    marginTop: 2,
   },
-  chart: {
+  divider: {
     marginVertical: 8,
-    borderRadius: 16,
+  },
+  exportButton: {
+    marginTop: 20,
+    marginBottom: 30,
   },
 }); 

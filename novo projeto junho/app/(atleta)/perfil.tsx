@@ -363,7 +363,7 @@ export default function PerfilAtleta() {
     return position.charAt(0).toUpperCase() + position.slice(1).toLowerCase();
   }
 
-  // Função para validar e formatar data
+  // Função para formatar data
   function formatDate(date: string): string {
     if (!date) return '';
     // Formato esperado: DD/MM/AAAA
@@ -372,7 +372,7 @@ export default function PerfilAtleta() {
     return `${parts[0].padStart(2, '0')}/${parts[1].padStart(2, '0')}/${parts[2]}`;
   }
 
-  // Função para validar e formatar telefone
+  // Função para formatar telefone
   function formatPhone(phone: string): string {
     if (!phone) return '';
     // Remove caracteres não numéricos
@@ -381,7 +381,7 @@ export default function PerfilAtleta() {
     return numbers.replace(/(\d{2})(\d{5})(\d{4})/, '($1) $2-$3');
   }
 
-  // Função para validar e formatar altura
+  // Função para formatar altura
   function formatHeight(height: string): string {
     if (!height) return '';
     const numHeight = parseFloat(height);
@@ -389,7 +389,7 @@ export default function PerfilAtleta() {
     return `${numHeight} cm`;
   }
 
-  // Função para validar e formatar peso
+  // Função para formatar peso
   function formatWeight(weight: string): string {
     if (!weight) return '';
     const numWeight = parseFloat(weight);
@@ -413,6 +413,12 @@ export default function PerfilAtleta() {
   function validatePhone(phone: string): boolean {
     const phoneRegex = /^\(\d{2}\) \d{5}-\d{4}$/;
     return phoneRegex.test(phone);
+  }
+
+  // Função para formatar esporte
+  function formatSport(sport: string): string {
+    if (!sport) return 'Não definido';
+    return sport.charAt(0).toUpperCase() + sport.slice(1).toLowerCase();
   }
 
   async function handleSaveProfile() {
@@ -566,8 +572,25 @@ export default function PerfilAtleta() {
     }
   };
 
+  // Debug: Verificar dados do usuário
+  console.log('🏃‍♂️ Perfil Atleta - Dados do usuário:', {
+    id: user?.id,
+    name: user?.name,
+    email: user?.email,
+    userType: user?.userType,
+    sport: user?.sport,
+    position: user?.position
+  });
+
   return (
     <SafeAreaView style={styles.container}>
+      {/* Debug Info - Remover em produção */}
+      <View style={styles.debugContainer}>
+        <Text style={styles.debugText}>
+          🔧 DEBUG: Tipo: {user?.userType} | Email: {user?.email}
+        </Text>
+      </View>
+
       <ScrollView showsVerticalScrollIndicator={false}>
         {/* Header do Perfil */}
         <View style={styles.profileHeader}>
@@ -639,10 +662,7 @@ export default function PerfilAtleta() {
               <Ionicons name="basketball" size={20} color="#666" />
               <Text style={styles.infoLabel}>Esporte:</Text>
               <Text style={styles.infoValue}>
-                {playerInfo.esporte ? 
-                  playerInfo.esporte.charAt(0).toUpperCase() + playerInfo.esporte.slice(1).toLowerCase() :
-                  'Não definido'
-                }
+                {formatSport(playerInfo.esporte)}
               </Text>
             </View>
           </View>
@@ -1390,5 +1410,16 @@ const styles = StyleSheet.create({
   modalHeaderTitle: {
     fontSize: 20,
     fontWeight: 'bold',
+  },
+  debugContainer: {
+    backgroundColor: '#FFE082',
+    padding: 8,
+    margin: 10,
+    borderRadius: 4,
+  },
+  debugText: {
+    fontSize: 12,
+    color: '#333',
+    textAlign: 'center',
   },
 });

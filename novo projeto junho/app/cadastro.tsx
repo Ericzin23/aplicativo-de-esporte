@@ -10,6 +10,7 @@ import {
   Platform,
   ScrollView,
   ActivityIndicator,
+  SafeAreaView,
 } from 'react-native';
 import { useRouter, useFocusEffect } from 'expo-router';
 import { useAuth } from '../contexts/AuthContext';
@@ -43,7 +44,7 @@ export default function Cadastro() {
   const [selectedPosicao, setSelectedPosicao] = useState<string>('');
   const [posicoesDisponiveis, setPosicoesDisponiveis] = useState<Array<{label: string, value: string}>>([]);
   
-  const { signUp } = useAuth();
+  const { signUp, clearCorruptedData, validateAndFixData } = useAuth();
   const router = useRouter();
   const { isDark } = useColorScheme();
 
@@ -176,6 +177,15 @@ export default function Cadastro() {
     }
   }
 
+  const handleClearData = async () => {
+    try {
+      await clearCorruptedData();
+      Alert.alert('Sucesso', 'Dados limpos com sucesso! Tente cadastrar novamente.');
+    } catch (error) {
+      Alert.alert('Erro', 'Não foi possível limpar os dados.');
+    }
+  };
+
   const userTypes = [
     {
       type: 'professor' as const,
@@ -196,287 +206,297 @@ export default function Cadastro() {
   ];
 
   return (
-    <KeyboardAvoidingView
-      style={[
-        styles.container,
-        { backgroundColor: isDark ? Colors.dark.background : Colors.light.background },
-      ]}
-      behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-      keyboardVerticalOffset={Platform.OS === 'ios' ? 0 : 20}
-    >
-      <ScrollView 
-        contentContainerStyle={styles.scrollContainer}
-        keyboardShouldPersistTaps="handled"
-        showsVerticalScrollIndicator={false}
+    <SafeAreaView style={styles.container}>
+      {/* Botão de debug - remover em produção */}
+      <TouchableOpacity 
+        style={styles.debugButton} 
+        onPress={handleClearData}
       >
-        <View style={styles.header}>
-          <TouchableOpacity
-            style={styles.backButton}
-            onPress={() => router.back()}
-          >
-            <Ionicons name="arrow-back" size={24} color="#0066FF" />
-          </TouchableOpacity>
-          <Ionicons name="person-add" size={80} color="#0066FF" />
-          <Text
-            style={[styles.title, { color: isDark ? Colors.dark.text : Colors.light.text }]}
-          >
-            Criar Conta
-          </Text>
-          <Text
-            style={[styles.subtitle, { color: isDark ? Colors.dark.icon : Colors.light.icon }]}
-          >
-            Escolha o tipo de perfil e preencha os dados
-          </Text>
-        </View>
+        <Text style={styles.debugButtonText}>🔧 Limpar Dados (Debug)</Text>
+      </TouchableOpacity>
 
-        <View style={styles.form}>
-          {/* Seleção de Tipo de Usuário */}
-          <View style={styles.userTypeSection}>
-            <Text style={styles.sectionTitle}>Tipo de Perfil</Text>
-            <View style={styles.userTypeContainer}>
-              {userTypes.map((type) => (
-                <TouchableOpacity
-                  key={type.type}
-                  style={[
-                    styles.userTypeCard,
-                    userType === type.type && styles.userTypeCardSelected,
-                    { borderColor: userType === type.type ? type.color : '#e0e0e0' }
-                  ]}
-                  onPress={() => setUserType(type.type)}
-                >
-                  <View style={[styles.userTypeIcon, { backgroundColor: type.backgroundColor }]}>
-                    <Ionicons name={type.icon as any} size={32} color={type.color} />
-                  </View>
-                  <Text style={[
-                    styles.userTypeTitle,
-                    userType === type.type && { color: type.color }
-                  ]}>
-                    {type.title}
-                  </Text>
-                  <Text style={styles.userTypeSubtitle}>{type.subtitle}</Text>
-                  {userType === type.type && (
-                    <View style={[styles.selectedIndicator, { backgroundColor: type.color }]}>
-                      <Ionicons name="checkmark" size={16} color="#fff" />
-                    </View>
-                  )}
-                </TouchableOpacity>
-              ))}
-            </View>
+      <KeyboardAvoidingView
+        style={[
+          styles.container,
+          { backgroundColor: isDark ? Colors.dark.background : Colors.light.background },
+        ]}
+        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+        keyboardVerticalOffset={Platform.OS === 'ios' ? 0 : 20}
+      >
+        <ScrollView 
+          contentContainerStyle={styles.scrollContainer}
+          keyboardShouldPersistTaps="handled"
+          showsVerticalScrollIndicator={false}
+        >
+          <View style={styles.header}>
+            <TouchableOpacity
+              style={styles.backButton}
+              onPress={() => router.back()}
+            >
+              <Ionicons name="arrow-back" size={24} color="#0066FF" />
+            </TouchableOpacity>
+            <Ionicons name="person-add" size={80} color="#0066FF" />
+            <Text
+              style={[styles.title, { color: isDark ? Colors.dark.text : Colors.light.text }]}
+            >
+              Criar Conta
+            </Text>
+            <Text
+              style={[styles.subtitle, { color: isDark ? Colors.dark.icon : Colors.light.icon }]}
+            >
+              Escolha o tipo de perfil e preencha os dados
+            </Text>
           </View>
 
-          {/* Seleção de Esporte (apenas para atletas) */}
-          {userType === 'atleta' && (
-            <View style={styles.sportSection}>
-              <Text style={styles.sectionTitle}>Selecionar Esporte</Text>
-              <Text style={styles.sectionSubtitle}>Escolha o esporte que você pratica</Text>
-              <View style={styles.sportsContainer}>
-                {Object.values(SPORTS_CONFIG).map((sport) => (
+          <View style={styles.form}>
+            {/* Seleção de Tipo de Usuário */}
+            <View style={styles.userTypeSection}>
+              <Text style={styles.sectionTitle}>Tipo de Perfil</Text>
+              <View style={styles.userTypeContainer}>
+                {userTypes.map((type) => (
                   <TouchableOpacity
-                    key={sport.id}
+                    key={type.type}
                     style={[
-                      styles.sportCard,
-                      selectedSport === sport.id && styles.sportCardSelected
+                      styles.userTypeCard,
+                      userType === type.type && styles.userTypeCardSelected,
+                      { borderColor: userType === type.type ? type.color : '#e0e0e0' }
                     ]}
-                    onPress={() => {
-                      setSelectedSport(sport.id);
-                      setSelectedPosicao(''); // Reset posição quando mudar o esporte
-                    }}
+                    onPress={() => setUserType(type.type)}
                   >
-                    <Ionicons 
-                      name={sport.icon as any} 
-                      size={32} 
-                      color={selectedSport === sport.id ? sport.color : '#666'} 
-                    />
+                    <View style={[styles.userTypeIcon, { backgroundColor: type.backgroundColor }]}>
+                      <Ionicons name={type.icon as any} size={32} color={type.color} />
+                    </View>
                     <Text style={[
-                      styles.sportName,
-                      selectedSport === sport.id && { color: sport.color }
+                      styles.userTypeTitle,
+                      userType === type.type && { color: type.color }
                     ]}>
-                      {sport.name}
+                      {type.title}
                     </Text>
-                    {selectedSport === sport.id && (
-                      <Ionicons name="checkmark-circle" size={20} color={sport.color} />
+                    <Text style={styles.userTypeSubtitle}>{type.subtitle}</Text>
+                    {userType === type.type && (
+                      <View style={[styles.selectedIndicator, { backgroundColor: type.color }]}>
+                        <Ionicons name="checkmark" size={16} color="#fff" />
+                      </View>
                     )}
                   </TouchableOpacity>
                 ))}
               </View>
+            </View>
 
-              {/* Seleção de Posição */}
-              {selectedSport && (
-                <View style={styles.posicaoSection}>
-                  <Text style={styles.sectionTitle}>Sua Posição</Text>
-                  <Text style={styles.sectionSubtitle}>
-                    {selectedSport === 'jiujitsu' || selectedSport === 'judo' ? 'Selecione sua Faixa' :
-                     selectedSport === 'capoeira' ? 'Selecione sua Corda' :
-                     selectedSport === 'boxe' || selectedSport === 'mma' ? 'Selecione sua Categoria' :
-                     'Selecione sua Posição'}
-                  </Text>
-                  <DropDownPicker
-                    items={posicoesDisponiveis}
-                    placeholder="Selecione sua posição"
-                    open={openPosicao}
-                    setOpen={setOpenPosicao}
-                    value={selectedPosicao}
-                    setValue={setSelectedPosicao}
-                    style={styles.dropdown}
-                    dropDownContainerStyle={styles.dropdownContainer}
-                    zIndex={3000}
-                    zIndexInverse={1000}
-                    listMode="MODAL"
+            {/* Seleção de Esporte (apenas para atletas) */}
+            {userType === 'atleta' && (
+              <View style={styles.sportSection}>
+                <Text style={styles.sectionTitle}>Selecionar Esporte</Text>
+                <Text style={styles.sectionSubtitle}>Escolha o esporte que você pratica</Text>
+                <View style={styles.sportsContainer}>
+                  {Object.values(SPORTS_CONFIG).map((sport) => (
+                    <TouchableOpacity
+                      key={sport.id}
+                      style={[
+                        styles.sportCard,
+                        selectedSport === sport.id && styles.sportCardSelected
+                      ]}
+                      onPress={() => {
+                        setSelectedSport(sport.id);
+                        setSelectedPosicao(''); // Reset posição quando mudar o esporte
+                      }}
+                    >
+                      <Ionicons 
+                        name={sport.icon as any} 
+                        size={32} 
+                        color={selectedSport === sport.id ? sport.color : '#666'} 
+                      />
+                      <Text style={[
+                        styles.sportName,
+                        selectedSport === sport.id && { color: sport.color }
+                      ]}>
+                        {sport.name}
+                      </Text>
+                      {selectedSport === sport.id && (
+                        <Ionicons name="checkmark-circle" size={20} color={sport.color} />
+                      )}
+                    </TouchableOpacity>
+                  ))}
+                </View>
+
+                {/* Seleção de Posição */}
+                {selectedSport && (
+                  <View style={styles.posicaoSection}>
+                    <Text style={styles.sectionTitle}>Sua Posição</Text>
+                    <Text style={styles.sectionSubtitle}>
+                      {selectedSport === 'jiujitsu' || selectedSport === 'judo' ? 'Selecione sua Faixa' :
+                       selectedSport === 'capoeira' ? 'Selecione sua Corda' :
+                       selectedSport === 'boxe' || selectedSport === 'mma' ? 'Selecione sua Categoria' :
+                       'Selecione sua Posição'}
+                    </Text>
+                    <DropDownPicker
+                      items={posicoesDisponiveis}
+                      placeholder="Selecione sua posição"
+                      open={openPosicao}
+                      setOpen={setOpenPosicao}
+                      value={selectedPosicao}
+                      setValue={setSelectedPosicao}
+                      style={styles.dropdown}
+                      dropDownContainerStyle={styles.dropdownContainer}
+                      zIndex={3000}
+                      zIndexInverse={1000}
+                      listMode="MODAL"
+                    />
+                  </View>
+                )}
+              </View>
+            )}
+
+            {/* Seleção de Professor (apenas para atletas) */}
+            {userType === 'atleta' && (
+              <View style={styles.professorSection}>
+                <Text style={styles.sectionTitle}>Selecionar Professor</Text>
+                <Text style={styles.sectionSubtitle}>Escolha o professor que irá acompanhar seu desempenho</Text>
+                <View style={styles.professorsContainer}>
+                  {professors.map((professor) => (
+                    <TouchableOpacity
+                      key={professor.id}
+                      style={[
+                        styles.professorCard,
+                        selectedProfessor === professor.id && styles.professorCardSelected
+                      ]}
+                      onPress={() => setSelectedProfessor(professor.id)}
+                    >
+                      <View style={styles.professorInfo}>
+                        <View style={styles.professorAvatar}>
+                          <Ionicons name="person" size={24} color="#0066FF" />
+                        </View>
+                        <View style={styles.professorDetails}>
+                          <Text style={styles.professorName}>{professor.name}</Text>
+                          <Text style={styles.professorEmail}>{professor.email}</Text>
+                        </View>
+                      </View>
+                      {selectedProfessor === professor.id && (
+                        <Ionicons name="checkmark-circle" size={24} color="#4CAF50" />
+                      )}
+                    </TouchableOpacity>
+                  ))}
+                </View>
+              </View>
+            )}
+
+            {/* Campos de Cadastro */}
+            {userType && (
+              <View style={styles.fieldsSection}>
+                <Text style={styles.sectionTitle}>Dados Pessoais</Text>
+                
+                <View style={styles.inputContainer}>
+                  <Ionicons name="person" size={20} color="#666" style={styles.inputIcon} />
+                  <AntiAutofillInput
+                    style={styles.input}
+                    placeholder="Nome completo"
+                    value={name}
+                    onChangeText={setName}
+                    autoCapitalize="words"
+                    autoCorrect={true}
+                    editable={true}
+                    selectTextOnFocus={true}
+                    keyboardType="default"
+                    textContentType="name"
                   />
                 </View>
-              )}
-            </View>
-          )}
 
-          {/* Seleção de Professor (apenas para atletas) */}
-          {userType === 'atleta' && (
-            <View style={styles.professorSection}>
-              <Text style={styles.sectionTitle}>Selecionar Professor</Text>
-              <Text style={styles.sectionSubtitle}>Escolha o professor que irá acompanhar seu desempenho</Text>
-              <View style={styles.professorsContainer}>
-                {professors.map((professor) => (
+                <View style={styles.inputContainer}>
+                  <Ionicons name="mail" size={20} color="#666" style={styles.inputIcon} />
+                  <AntiAutofillInput
+                    style={styles.input}
+                    placeholder="Email"
+                    value={email}
+                    onChangeText={setEmail}
+                    keyboardType="email-address"
+                    autoCapitalize="none"
+                    autoCorrect={false}
+                    editable={true}
+                    selectTextOnFocus={true}
+                    textContentType="emailAddress"
+                  />
+                </View>
+
+                <View style={styles.inputContainer}>
+                  <Ionicons name="lock-closed" size={20} color="#666" style={styles.inputIcon} />
+                  <AntiAutofillInput
+                    style={styles.inputWithIcon}
+                    placeholder="Senha (mín. 6 caracteres)"
+                    value={password}
+                    onChangeText={setPassword}
+                    secureTextEntry={!showPassword}
+                    autoCapitalize="none"
+                    autoCorrect={false}
+                    editable={true}
+                    selectTextOnFocus={true}
+                    keyboardType="default"
+                    textContentType="oneTimeCode"
+                  />
                   <TouchableOpacity
-                    key={professor.id}
-                    style={[
-                      styles.professorCard,
-                      selectedProfessor === professor.id && styles.professorCardSelected
-                    ]}
-                    onPress={() => setSelectedProfessor(professor.id)}
+                    onPress={() => setShowPassword(!showPassword)}
+                    style={styles.eyeIcon}
                   >
-                    <View style={styles.professorInfo}>
-                      <View style={styles.professorAvatar}>
-                        <Ionicons name="person" size={24} color="#0066FF" />
-                      </View>
-                      <View style={styles.professorDetails}>
-                        <Text style={styles.professorName}>{professor.name}</Text>
-                        <Text style={styles.professorEmail}>{professor.email}</Text>
-                      </View>
-                    </View>
-                    {selectedProfessor === professor.id && (
-                      <Ionicons name="checkmark-circle" size={24} color="#4CAF50" />
-                    )}
+                    <Ionicons
+                      name={showPassword ? 'eye-off' : 'eye'}
+                      size={20}
+                      color="#666"
+                    />
                   </TouchableOpacity>
-                ))}
-              </View>
-            </View>
-          )}
+                </View>
 
-          {/* Campos de Cadastro */}
-          {userType && (
-            <View style={styles.fieldsSection}>
-              <Text style={styles.sectionTitle}>Dados Pessoais</Text>
-              
-              <View style={styles.inputContainer}>
-                <Ionicons name="person" size={20} color="#666" style={styles.inputIcon} />
-                <AntiAutofillInput
-                  style={styles.input}
-                  placeholder="Nome completo"
-                  value={name}
-                  onChangeText={setName}
-                  autoCapitalize="words"
-                  autoCorrect={true}
-                  editable={true}
-                  selectTextOnFocus={true}
-                  keyboardType="default"
-                  textContentType="name"
-                />
-              </View>
-
-              <View style={styles.inputContainer}>
-                <Ionicons name="mail" size={20} color="#666" style={styles.inputIcon} />
-                <AntiAutofillInput
-                  style={styles.input}
-                  placeholder="Email"
-                  value={email}
-                  onChangeText={setEmail}
-                  keyboardType="email-address"
-                  autoCapitalize="none"
-                  autoCorrect={false}
-                  editable={true}
-                  selectTextOnFocus={true}
-                  textContentType="emailAddress"
-                />
-              </View>
-
-              <View style={styles.inputContainer}>
-                <Ionicons name="lock-closed" size={20} color="#666" style={styles.inputIcon} />
-                <AntiAutofillInput
-                  style={styles.inputWithIcon}
-                  placeholder="Senha (mín. 6 caracteres)"
-                  value={password}
-                  onChangeText={setPassword}
-                  secureTextEntry={!showPassword}
-                  autoCapitalize="none"
-                  autoCorrect={false}
-                  editable={true}
-                  selectTextOnFocus={true}
-                  keyboardType="default"
-                  textContentType="oneTimeCode"
-                />
-                <TouchableOpacity
-                  onPress={() => setShowPassword(!showPassword)}
-                  style={styles.eyeIcon}
-                >
-                  <Ionicons
-                    name={showPassword ? 'eye-off' : 'eye'}
-                    size={20}
-                    color="#666"
+                <View style={styles.inputContainer}>
+                  <Ionicons name="lock-closed" size={20} color="#666" style={styles.inputIcon} />
+                  <AntiAutofillInput
+                    style={styles.inputWithIcon}
+                    placeholder="Confirmar senha"
+                    value={confirmPassword}
+                    onChangeText={setConfirmPassword}
+                    secureTextEntry={!showConfirmPassword}
+                    autoCapitalize="none"
+                    autoCorrect={false}
+                    editable={true}
+                    selectTextOnFocus={true}
+                    keyboardType="default"
+                    textContentType="oneTimeCode"
                   />
+                  <TouchableOpacity
+                    onPress={() => setShowConfirmPassword(!showConfirmPassword)}
+                    style={styles.eyeIcon}
+                  >
+                    <Ionicons
+                      name={showConfirmPassword ? 'eye-off' : 'eye'}
+                      size={20}
+                      color="#666"
+                    />
+                  </TouchableOpacity>
+                </View>
+
+                <TouchableOpacity
+                  style={[styles.signUpButton, isLoading && styles.signUpButtonDisabled]}
+                  onPress={handleSignUp}
+                  disabled={isLoading}
+                >
+                  {isLoading ? (
+                    <ActivityIndicator color="#fff" />
+                  ) : (
+                    <Text style={styles.signUpButtonText}>
+                      Criar Conta {userType === 'professor' ? 'de Professor' : 'de Atleta'}
+                    </Text>
+                  )}
                 </TouchableOpacity>
               </View>
+            )}
 
-              <View style={styles.inputContainer}>
-                <Ionicons name="lock-closed" size={20} color="#666" style={styles.inputIcon} />
-                <AntiAutofillInput
-                  style={styles.inputWithIcon}
-                  placeholder="Confirmar senha"
-                  value={confirmPassword}
-                  onChangeText={setConfirmPassword}
-                  secureTextEntry={!showConfirmPassword}
-                  autoCapitalize="none"
-                  autoCorrect={false}
-                  editable={true}
-                  selectTextOnFocus={true}
-                  keyboardType="default"
-                  textContentType="oneTimeCode"
-                />
-                <TouchableOpacity
-                  onPress={() => setShowConfirmPassword(!showConfirmPassword)}
-                  style={styles.eyeIcon}
-                >
-                  <Ionicons
-                    name={showConfirmPassword ? 'eye-off' : 'eye'}
-                    size={20}
-                    color="#666"
-                  />
-                </TouchableOpacity>
-              </View>
-
-              <TouchableOpacity
-                style={[styles.signUpButton, isLoading && styles.signUpButtonDisabled]}
-                onPress={handleSignUp}
-                disabled={isLoading}
-              >
-                {isLoading ? (
-                  <ActivityIndicator color="#fff" />
-                ) : (
-                  <Text style={styles.signUpButtonText}>
-                    Criar Conta {userType === 'professor' ? 'de Professor' : 'de Atleta'}
-                  </Text>
-                )}
+            <View style={styles.footer}>
+              <Text style={styles.footerText}>Já tem uma conta? </Text>
+              <TouchableOpacity onPress={() => router.push('/login')}>
+                <Text style={styles.linkText}>Faça login</Text>
               </TouchableOpacity>
             </View>
-          )}
-
-          <View style={styles.footer}>
-            <Text style={styles.footerText}>Já tem uma conta? </Text>
-            <TouchableOpacity onPress={() => router.push('/login')}>
-              <Text style={styles.linkText}>Faça login</Text>
-            </TouchableOpacity>
           </View>
-        </View>
-      </ScrollView>
-    </KeyboardAvoidingView>
+        </ScrollView>
+      </KeyboardAvoidingView>
+    </SafeAreaView>
   );
 }
 
@@ -750,5 +770,18 @@ const styles = StyleSheet.create({
   dropdownContainer: {
     borderColor: '#0066FF',
     backgroundColor: '#f9f9f9',
+  },
+  debugButton: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    padding: 10,
+    backgroundColor: '#0066FF',
+    borderRadius: 5,
+  },
+  debugButtonText: {
+    color: '#fff',
+    fontSize: 14,
+    fontWeight: 'bold',
   },
 }); 

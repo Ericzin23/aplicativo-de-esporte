@@ -1,5 +1,17 @@
 import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import {
+  View,
+  Text,
+  StyleSheet,
+  ScrollView,
+  SafeAreaView,
+  TouchableOpacity,
+} from 'react-native';
+import { Ionicons } from '@expo/vector-icons';
+import { useAuth } from '../../contexts/AuthContext';
+import { useAppData } from '../../contexts/AppDataContext';
+import { Calendar } from 'react-native-calendars';
 
 interface User {
   id: string;
@@ -205,10 +217,133 @@ export function AuthProvider({ children }: AuthProviderProps) {
   );
 }
 
-export function useAuth() {
-  const context = useContext(AuthContext);
-  if (!context) {
-    throw new Error('useAuth deve ser usado dentro de um AuthProvider');
-  }
-  return context;
+export default function AgendaAtleta() {
+  const { user } = useAuth();
+  const { events } = useAppData();
+  const [selectedDate, setSelectedDate] = useState('');
+  const [markedDates, setMarkedDates] = useState({});
+
+  useEffect(() => {
+    // Marcar datas com eventos
+    const marked = {};
+    events.forEach(event => {
+      const date = event.date.split('T')[0];
+      marked[date] = {
+        marked: true,
+        dotColor: event.type === 'jogo' ? '#4CAF50' : '#2196F3'
+      };
+    });
+    setMarkedDates(marked);
+  }, [events]);
+
+  const getEventsForDate = (date: string) => {
+    return events.filter(event => event.date.startsWith(date));
+  };
+
+  return (
+    <SafeAreaView style={styles.container}>
+      <View style={styles.header}>
+        <Text style={styles.title}>Agenda</Text>
+      </View>
+
+      <Calendar
+        onDayPress={day => setSelectedDate(day.dateString)}
+        markedDates={{
+          ...markedDates,
+          [selectedDate]: {
+            ...markedDates[selectedDate],
+            selected: true,
+            selectedColor: '#0066FF'
+          }
+        }}
+        theme={{
+          todayTextColor: '#0066FF',
+          arrowColor: '#0066FF',
+          dotColor: '#0066FF',
+          selectedDayBackgroundColor: '#0066FF'
+        }}
+      />
+
+      <ScrollView style={styles.eventsContainer}>
+        {selectedDate ? (
+          getEventsForDate(selectedDate).map(event => (
+            <View key={event.id} style={styles.eventCard}>
+              <View style={styles.eventHeader}>
+                <Ionicons
+                  name={event.type === 'jogo' ? 'football' : 'fitness'}
+                  size={24}
+                  color={event.type === 'jogo' ? '#4CAF50' : '#2196F3'}
+                />
+                <Text style={styles.eventTitle}>{event.title}</Text>
+              </View>
+              <Text style={styles.eventTime}>{event.time}</Text>
+              <Text style={styles.eventDescription}>{event.description}</Text>
+            </View>
+          ))
+        ) : (
+          <Text style={styles.noEventsText}>Selecione uma data para ver os eventos</Text>
+        )}
+      </ScrollView>
+    </SafeAreaView>
+  );
 }
+
+const styles = StyleSheet.create({
+  container: {
+    flex: 1,
+    backgroundColor: '#f5f5f5',
+  },
+  header: {
+    padding: 16,
+    backgroundColor: '#fff',
+    borderBottomWidth: 1,
+    borderBottomColor: '#e0e0e0',
+  },
+  title: {
+    fontSize: 24,
+    fontWeight: 'bold',
+    color: '#333',
+  },
+  eventsContainer: {
+    flex: 1,
+    padding: 16,
+  },
+  eventCard: {
+    backgroundColor: '#fff',
+    borderRadius: 12,
+    padding: 16,
+    marginBottom: 12,
+    elevation: 2,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+  },
+  eventHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 8,
+  },
+  eventTitle: {
+    fontSize: 18,
+    fontWeight: 'bold',
+    color: '#333',
+    marginLeft: 8,
+  },
+  eventTime: {
+    fontSize: 14,
+    color: '#666',
+    marginBottom: 8,
+  },
+  eventDescription: {
+    fontSize: 14,
+    color: '#666',
+    lineHeight: 20,
+  },
+  noEventsText: {
+    textAlign: 'center',
+    color: '#666',
+    fontSize: 16,
+    marginTop: 24,
+  },
+});

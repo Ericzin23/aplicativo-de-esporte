@@ -13,6 +13,8 @@ import {
 import { Ionicons } from '@expo/vector-icons';
 import { useAppData } from '../../contexts/AppDataContext';
 import { AddTeamModal } from '../../components/AddTeamModal';
+import { useFocusEffect } from '@react-navigation/native';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 
 interface Team {
   id: string;
@@ -43,7 +45,20 @@ export default function Times() {
   const [showTeamModal, setShowTeamModal] = useState(false);
   const [selectedTeam, setSelectedTeam] = useState<Team | null>(null);
   const [showTeamDetails, setShowTeamDetails] = useState(false);
-  const { teams, players, events, getPlayersByTeam, getTeamsBySport } = useAppData();
+  const { teams, players, events, getPlayersByTeam, getTeamsBySport, updatePlayer, reloadData, debugStorage } = useAppData();
+
+  // Recarregar dados quando a tela ganha foco (mas não muito frequentemente)
+  useFocusEffect(
+    React.useCallback(() => {
+      console.log('🔄 Tela Times ganhou foco');
+      // Aguardar um pouco antes de recarregar para evitar conflitos
+      const timeoutId = setTimeout(() => {
+        reloadData(false); // Não forçar recarregamento
+      }, 500);
+      
+      return () => clearTimeout(timeoutId);
+    }, [])
+  );
 
   // Esportes disponíveis
   const sports = ['Todos', 'Futebol', 'Vôlei', 'Basquete', 'Futsal', 'Handebol'];
@@ -54,14 +69,14 @@ export default function Times() {
     
     // Filtro por esporte
     if (selectedSport !== 'Todos') {
-      const sportKey = selectedSport.toLowerCase();
+      const sportKey = selectedSport?.toLowerCase() || '';
       filtered = getTeamsBySport(sportKey);
     }
     
     // Filtro por busca
     if (searchText) {
       filtered = filtered.filter(team =>
-        team.name.toLowerCase().includes(searchText.toLowerCase())
+        team.name?.toLowerCase().includes(searchText.toLowerCase())
       );
     }
     
@@ -80,7 +95,10 @@ export default function Times() {
   };
 
   const getTeamColor = (sport: string) => {
-    switch (sport.toLowerCase()) {
+    if (!sport) return '#666';
+    
+    const sportLower = sport.toLowerCase();
+    switch (sportLower) {
       case 'futebol': return '#4CAF50';
       case 'volei': case 'vôlei': return '#FF9800';
       case 'basquete': return '#FF5722';
@@ -91,7 +109,10 @@ export default function Times() {
   };
 
   const getSportIcon = (sport: string) => {
-    switch (sport.toLowerCase()) {
+    if (!sport) return 'fitness';
+    
+    const sportLower = sport.toLowerCase();
+    switch (sportLower) {
       case 'futebol': return 'football';
       case 'volei': case 'vôlei': return 'basketball';
       case 'basquete': return 'basketball';
@@ -123,8 +144,48 @@ export default function Times() {
       event.title?.toLowerCase().includes(selectedTeam.name?.toLowerCase() || '')
     );
     
+    // Jogadores disponíveis (sem time ou do mesmo esporte)
+    const availablePlayers = players.filter(player => 
+      player.sport === selectedTeam.sport && 
+      (player.teamId === '' || player.teamId === null || player.teamId === undefined)
+    );
+    
     const totalGames = selectedTeam.wins + selectedTeam.losses + selectedTeam.draws;
     const winPercentage = totalGames > 0 ? ((selectedTeam.wins / totalGames) * 100).toFixed(1) : '0';
+
+    const addPlayerToTeam = async (playerId: string) => {
+      try {
+        console.log('➕ Adicionando jogador ao time:', playerId);
+        await updatePlayer(playerId, { teamId: selectedTeam.id });
+        
+        // Aguardar um pouco antes de recarregar
+        setTimeout(() => {
+          reloadData(true); // Forçar recarregamento após mudança
+        }, 200);
+        
+        Alert.alert('Sucesso!', 'Jogador adicionado ao time!');
+      } catch (error) {
+        console.error('❌ Erro ao adicionar jogador ao time:', error);
+        Alert.alert('Erro', 'Não foi possível adicionar o jogador ao time.');
+      }
+    };
+
+    const removePlayerFromTeam = async (playerId: string) => {
+      try {
+        console.log('➖ Removendo jogador do time:', playerId);
+        await updatePlayer(playerId, { teamId: '' });
+        
+        // Aguardar um pouco antes de recarregar
+        setTimeout(() => {
+          reloadData(true); // Forçar recarregamento após mudança
+        }, 200);
+        
+        Alert.alert('Sucesso!', 'Jogador removido do time!');
+      } catch (error) {
+        console.error('❌ Erro ao remover jogador do time:', error);
+        Alert.alert('Erro', 'Não foi possível remover o jogador do time.');
+      }
+    };
     
     return (
       <Modal
@@ -200,7 +261,7 @@ export default function Times() {
               {/* Jogadores do Time */}
               <View style={styles.modalSection}>
                 <Text style={styles.modalSectionTitle}>
-                  👥 Jogadores ({teamPlayers.length})
+                  👥 Jogadores do Time ({teamPlayers.length})
                 </Text>
                 {teamPlayers.length > 0 ? (
                   teamPlayers.map((player) => (
@@ -214,21 +275,57 @@ export default function Times() {
                           <Text style={styles.playerPosition}>{player.position}</Text>
                         </View>
                       </View>
-                      <View style={styles.playerStats}>
+                      <View style={styles.playerActions}>
                         <Text style={styles.playerStatText}>
-                          {player.goals}G {player.assists}A
+                          {player.stats?.goals || 0}G {player.stats?.assists || 0}A
                         </Text>
-                        <Text style={styles.playerAge}>{player.age} anos</Text>
+                        <TouchableOpacity 
+                          onPress={() => removePlayerFromTeam(player.id)}
+                          style={styles.removePlayerButton}
+                        >
+                          <Ionicons name="remove-circle" size={20} color="#F44336" />
+                        </TouchableOpacity>
                       </View>
                     </View>
                   ))
                 ) : (
                   <View style={styles.emptyPlayers}>
                     <Ionicons name="person-add-outline" size={40} color="#ccc" />
-                    <Text style={styles.emptyPlayersText}>Nenhum jogador cadastrado</Text>
+                    <Text style={styles.emptyPlayersText}>Nenhum jogador no time</Text>
                   </View>
                 )}
               </View>
+
+              {/* Jogadores Disponíveis */}
+              {availablePlayers.length > 0 && (
+                <View style={styles.modalSection}>
+                  <Text style={styles.modalSectionTitle}>
+                    ➕ Jogadores Disponíveis ({availablePlayers.length})
+                  </Text>
+                  <Text style={styles.sectionDescription}>
+                    Jogadores de {selectedTeam.sport} sem time que podem ser adicionados:
+                  </Text>
+                  {availablePlayers.map((player) => (
+                    <View key={player.id} style={styles.availablePlayerItem}>
+                      <View style={styles.playerInfo}>
+                        <View style={styles.playerAvatar}>
+                          <Ionicons name="person-add" size={20} color="#4CAF50" />
+                        </View>
+                        <View>
+                          <Text style={styles.playerName}>{player.name}</Text>
+                          <Text style={styles.playerPosition}>{player.position}</Text>
+                        </View>
+                      </View>
+                      <TouchableOpacity 
+                        onPress={() => addPlayerToTeam(player.id)}
+                        style={styles.addPlayerButton}
+                      >
+                        <Ionicons name="add-circle" size={24} color="#4CAF50" />
+                      </TouchableOpacity>
+                    </View>
+                  ))}
+                </View>
+              )}
 
               {/* Eventos Relacionados */}
               <View style={styles.modalSection}>
@@ -267,14 +364,60 @@ export default function Times() {
     );
   };
 
+  const handleRefresh = async () => {
+    console.log('🔄 Refresh manual dos dados...');
+    await reloadData(true); // Forçar recarregamento manual
+  };
+
+  const handleDebug = async () => {
+    console.log('🔍 Executando debug manual...');
+    await debugStorage();
+  };
+
+  const handleClearAll = async () => {
+    Alert.alert(
+      'Limpar Todos os Dados',
+      'Isso irá remover TODOS os dados salvos (times, jogadores, usuários). Tem certeza?',
+      [
+        { text: 'Cancelar', style: 'cancel' },
+        {
+          text: 'Limpar Tudo',
+          style: 'destructive',
+          onPress: async () => {
+            try {
+              await AsyncStorage.clear();
+              console.log('🗑️ AsyncStorage limpo completamente');
+              await reloadData();
+              Alert.alert('Sucesso', 'Todos os dados foram removidos');
+            } catch (error) {
+              console.error('❌ Erro ao limpar dados:', error);
+              Alert.alert('Erro', 'Não foi possível limpar os dados');
+            }
+          }
+        }
+      ]
+    );
+  };
+
   return (
     <SafeAreaView style={styles.container}>
       {/* Header */}
       <View style={styles.header}>
         <Text style={styles.title}>Times</Text>
-        <TouchableOpacity style={styles.addButton} onPress={handleAddTeam}>
-          <Ionicons name="add" size={24} color="#fff" />
-        </TouchableOpacity>
+        <View style={styles.headerButtons}>
+          <TouchableOpacity style={styles.clearButton} onPress={handleClearAll}>
+            <Ionicons name="trash" size={20} color="#F44336" />
+          </TouchableOpacity>
+          <TouchableOpacity style={styles.debugButton} onPress={handleDebug}>
+            <Ionicons name="bug" size={20} color="#FF9800" />
+          </TouchableOpacity>
+          <TouchableOpacity style={styles.refreshButton} onPress={handleRefresh}>
+            <Ionicons name="refresh" size={20} color="#0066FF" />
+          </TouchableOpacity>
+          <TouchableOpacity style={styles.addButton} onPress={handleAddTeam}>
+            <Ionicons name="add" size={24} color="#fff" />
+          </TouchableOpacity>
+        </View>
       </View>
 
       {/* Search */}
@@ -356,60 +499,30 @@ export default function Times() {
             
             return (
               <TouchableOpacity
-                key={team.id}
+                key={`team-${team.id}`}
                 style={styles.teamCard}
                 onPress={() => handleTeamPress(team)}
                 activeOpacity={0.7}
               >
-                <View style={styles.teamHeader}>
-                  <View style={styles.teamInfo}>
-                    <View style={[
-                      styles.teamColorIndicator, 
-                      { backgroundColor: getTeamColor(team.sport) }
-                    ]}>
-                      <Ionicons 
-                        name={getSportIcon(team.sport) as any} 
-                        size={20} 
-                        color="#fff" 
-                      />
-                    </View>
-                    <View style={styles.teamDetails}>
-                      <Text style={styles.teamName}>{team.name}</Text>
-                      <View style={styles.teamMeta}>
-                        <Text style={styles.teamPlayers}>
-                          {teamPlayers.length} jogadores
-                        </Text>
-                        <Text style={styles.teamSport}>
-                          {team.sport ? 
-                            team.sport.charAt(0).toUpperCase() + team.sport.slice(1).toLowerCase() :
-                            'Não definido'
-                          }
-                        </Text>
-                      </View>
-                    </View>
+                <View style={styles.teamInfo}>
+                  <View style={[styles.teamIcon, { backgroundColor: getTeamColor(team.sport) }]}>
+                    <Ionicons name={getSportIcon(team.sport) as any} size={24} color="#fff" />
                   </View>
-                  <Ionicons name="chevron-forward" size={20} color="#666" />
-                </View>
-                
-                <View style={styles.teamStats}>
-                  <View style={styles.statItem}>
-                    <Text style={[styles.statValue, { color: '#4CAF50' }]}>{team.wins}</Text>
-                    <Text style={styles.statLabel}>V</Text>
-                  </View>
-                  <View style={styles.statItem}>
-                    <Text style={[styles.statValue, { color: '#FF9800' }]}>{team.draws}</Text>
-                    <Text style={styles.statLabel}>E</Text>
-                  </View>
-                  <View style={styles.statItem}>
-                    <Text style={[styles.statValue, { color: '#F44336' }]}>{team.losses}</Text>
-                    <Text style={styles.statLabel}>D</Text>
-                  </View>
-                  <View style={styles.statItem}>
-                    <Text style={[styles.statValue, { color: '#2196F3' }]}>
-                      {winPercentage}%
+                  <View>
+                    <Text style={styles.teamName}>{team.name}</Text>
+                    <Text style={styles.teamSport}>
+                      {team.sport ? 
+                        team.sport.charAt(0).toUpperCase() + team.sport.slice(1).toLowerCase() :
+                        'Não definido'
+                      }
                     </Text>
-                    <Text style={styles.statLabel}>Aproveitamento</Text>
                   </View>
+                </View>
+                <View style={styles.teamStats}>
+                  <Text style={styles.teamStatText}>
+                    {team.wins}V {team.draws}E {team.losses}D
+                  </Text>
+                  <Text style={styles.teamPlayers}>{team.players} jogadores</Text>
                 </View>
               </TouchableOpacity>
             );
@@ -466,6 +579,20 @@ const styles = StyleSheet.create({
     fontWeight: 'bold',
     color: '#333',
   },
+  headerButtons: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  clearButton: {
+    padding: 5,
+  },
+  debugButton: {
+    padding: 5,
+  },
+  refreshButton: {
+    padding: 5,
+  },
   addButton: {
     backgroundColor: '#0066FF',
     borderRadius: 20,
@@ -500,9 +627,6 @@ const styles = StyleSheet.create({
     paddingVertical: 12,
     fontSize: 16,
     color: '#333',
-  },
-  clearButton: {
-    padding: 5,
   },
   filterContainer: {
     marginHorizontal: 15,
@@ -584,18 +708,13 @@ const styles = StyleSheet.create({
     shadowRadius: 3.84,
     elevation: 5,
   },
-  teamHeader: {
+  teamInfo: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
     marginBottom: 15,
   },
-  teamInfo: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    flex: 1,
-  },
-  teamColorIndicator: {
+  teamIcon: {
     width: 50,
     height: 50,
     borderRadius: 25,
@@ -603,22 +722,10 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     marginRight: 15,
   },
-  teamDetails: {
-    flex: 1,
-  },
   teamName: {
     fontSize: 18,
     fontWeight: 'bold',
     color: '#333',
-    marginBottom: 4,
-  },
-  teamMeta: {
-    flexDirection: 'row',
-    gap: 12,
-  },
-  teamPlayers: {
-    fontSize: 14,
-    color: '#666',
   },
   teamSport: {
     fontSize: 12,
@@ -630,21 +737,15 @@ const styles = StyleSheet.create({
     borderRadius: 10,
   },
   teamStats: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
+    alignItems: 'flex-end',
   },
-  statItem: {
-    alignItems: 'center',
-    flex: 1,
-  },
-  statValue: {
+  teamStatText: {
     fontSize: 18,
     fontWeight: 'bold',
   },
-  statLabel: {
-    fontSize: 12,
+  teamPlayers: {
+    fontSize: 14,
     color: '#666',
-    marginTop: 2,
   },
   emptyContainer: {
     flex: 1,
@@ -789,7 +890,7 @@ const styles = StyleSheet.create({
     color: '#666',
     marginTop: 2,
   },
-  playerStats: {
+  playerActions: {
     alignItems: 'flex-end',
   },
   playerStatText: {
@@ -797,10 +898,8 @@ const styles = StyleSheet.create({
     color: '#0066FF',
     fontWeight: '600',
   },
-  playerAge: {
-    fontSize: 10,
-    color: '#999',
-    marginTop: 2,
+  removePlayerButton: {
+    padding: 5,
   },
   emptyPlayers: {
     alignItems: 'center',
@@ -848,5 +947,21 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: '#666',
     marginTop: 10,
+  },
+  sectionDescription: {
+    fontSize: 12,
+    color: '#666',
+    marginBottom: 10,
+  },
+  availablePlayerItem: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingVertical: 12,
+    borderBottomWidth: 1,
+    borderBottomColor: '#f0f0f0',
+  },
+  addPlayerButton: {
+    padding: 5,
   },
 }); 

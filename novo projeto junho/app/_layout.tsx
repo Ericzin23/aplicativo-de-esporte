@@ -25,18 +25,36 @@ function RootLayoutNav() {
   useEffect(() => {
     if (authLoading) return;
 
-    const inAuthGroup = segments[0] === '(tabs)' || segments[0] === '(atleta)';
-    const inAuthPages = ['login', 'cadastro'].includes(segments[0]);
+    console.log('Navegação - Usuário:', user?.userType, 'Segmentos:', segments);
+
+    const inAuthGroup = segments[0] === '(tabs)' || segments[0] === '(atleta)' || segments[0] === '(professor)';
+    const inAuthPages = ['login', 'cadastro', 'esqueceuSenha'].includes(segments[0]);
 
     if (!user && !inAuthPages) {
       // Usuário não logado, redirecionar para login
+      console.log('Redirecionando para login - usuário não logado');
       router.replace('/login');
     } else if (user && !inAuthGroup) {
       // Usuário logado, redirecionar baseado no tipo
+      console.log('Redirecionando baseado no tipo de usuário:', user.userType);
       if (user.userType === 'professor') {
         router.replace('/(tabs)');
       } else if (user.userType === 'atleta') {
         router.replace('/(atleta)');
+      }
+    } else if (user && inAuthGroup) {
+      // Verificar se está na área correta
+      const isInCorrectArea = 
+        (user.userType === 'professor' && segments[0] === '(tabs)') ||
+        (user.userType === 'atleta' && segments[0] === '(atleta)');
+      
+      if (!isInCorrectArea) {
+        console.log('Usuário na área incorreta, redirecionando...');
+        if (user.userType === 'professor') {
+          router.replace('/(tabs)');
+        } else if (user.userType === 'atleta') {
+          router.replace('/(atleta)');
+        }
       }
     }
   }, [user, segments, authLoading]);
@@ -53,9 +71,13 @@ function RootLayoutNav() {
     <Stack screenOptions={{ headerShown: false }}>
       <Stack.Screen name="login" />
       <Stack.Screen name="cadastro" />
+      <Stack.Screen name="cadastroProfissional" />
+      <Stack.Screen name="esqueceuSenha" />
       <Stack.Screen name="editarPerfil" />
+      <Stack.Screen name="perfilEsporte" />
       <Stack.Screen name="(tabs)" />
       <Stack.Screen name="(atleta)" />
+      <Stack.Screen name="(professor)" />
     </Stack>
   );
 }
