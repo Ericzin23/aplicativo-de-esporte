@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { View, Text, ActivityIndicator, StyleSheet, Platform } from 'react-native';
+import { View, Text, ActivityIndicator, StyleSheet } from 'react-native';
 import { AppThemeProvider } from '../components/AppThemeProvider';
 import { Colors } from '@/constants/Colors';
 import { Stack } from 'expo-router';
@@ -101,18 +101,20 @@ export default function RootLayout() {
   }
 
   return (
-   <ThemeProvider value={colorScheme.isDark ? DarkTheme : DefaultTheme}>
-  <AppThemeProvider>
-    <AuthProvider>
-      <NotificationProvider>
-        <AppDataProvider>
-          <RootLayoutNav />
-          <StatusBar style="auto" />
-        </AppDataProvider>
-      </NotificationProvider>
-    </AuthProvider>
-  </AppThemeProvider>
-</ThemeProvider>
+    <GestureHandlerRootView style={{ flex: 1 }}>
+      <ThemeProvider value={colorScheme.isDark ? DarkTheme : DefaultTheme}>
+        <AppThemeProvider>
+          <AuthProvider>
+            <NotificationProvider>
+              <AppDataProvider>
+                <RootLayoutNav />
+                <StatusBar style="auto" />
+              </AppDataProvider>
+            </NotificationProvider>
+          </AuthProvider>
+        </AppThemeProvider>
+      </ThemeProvider>
+    </GestureHandlerRootView>
   );
 }
 

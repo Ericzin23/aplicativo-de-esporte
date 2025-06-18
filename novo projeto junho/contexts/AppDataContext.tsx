@@ -38,7 +38,7 @@ interface Player {
   };
 }
 
-interface Event {
+export interface Event {
   id: string;
   title: string;
   type: 'jogo' | 'treino' | 'reuniao';
@@ -66,6 +66,7 @@ interface AppDataContextType {
   addTeam: (team: Omit<Team, 'id' | 'createdAt'>) => Promise<void>;
   addPlayer: (player: Omit<Player, 'id'>) => Promise<void>;
   addEvent: (event: Omit<Event, 'id' | 'createdAt'>) => Promise<void>;
+  updateEvent: (id: string, event: Partial<Event>) => Promise<void>;
   addGuidance: (playerId: string, guidance: Omit<Guidance, 'id'>) => Promise<void>;
   addPlayerStats: (playerId: string, stats: Record<string, number>) => Promise<void>;
   updateTeam: (id: string, team: Partial<Team>) => void;
@@ -225,8 +226,6 @@ export function AppDataProvider({ children }: { children: ReactNode }) {
     }
   }, [players, notifyStats, showNotification]);
 
-  // As demais funções seguem...
-
   const value = {
     teams,
     players,
@@ -235,9 +234,23 @@ export function AppDataProvider({ children }: { children: ReactNode }) {
     addTeam,
     addPlayer,
     addEvent,
+    updateEvent: async () => {}, // Placeholder (you can update with the real logic later)
+    updateTeam: () => {}, // Placeholder
+    updatePlayer: () => {}, // Placeholder
+    deleteTeam: () => {}, // Placeholder
+    deletePlayer: () => {}, // Placeholder
+    getPlayersByTeam: () => [], // Placeholder
+    getPlayersByPosition: () => [], // Placeholder
+    getPlayersBySport: () => [], // Placeholder
+    getTeamsBySport: () => [], // Placeholder
+    getEventsBySport: () => [], // Placeholder
+    getTodayEvents: () => [], // Placeholder
+    getUpcomingEvents: () => [], // Placeholder
+    getStats: () => ({ totalTeams: 0, totalPlayers: 0, todayGames: 0, todayTrainings: 0 }), // Placeholder
     addGuidance,
     addPlayerStats,
-    // ...e todas as outras funções que você já declarou
+    syncProfessorToAluno: () => {}, // Placeholder
+    syncAlunoToProfessor: () => {}, // Placeholder
   };
 
   if (isLoading) {

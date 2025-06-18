@@ -11,6 +11,7 @@ import {
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import { useAppData } from '../contexts/AppDataContext';
+import { createBackupZip } from '../utils/backup';
 
 export default function Relatorios() {
   const router = useRouter();
@@ -49,12 +50,13 @@ export default function Relatorios() {
     return acc;
   }, {} as Record<string, number>);
 
-  const handleExport = () => {
-    Alert.alert(
-      'Exportar Relatório',
-      'Funcionalidade de exportação em desenvolvimento. Em breve você poderá exportar os relatórios em PDF.',
-      [{ text: 'OK' }]
-    );
+  const handleExport = async () => {
+    try {
+      const path = await createBackupZip();
+      Alert.alert('Sucesso!', `Relatório exportado para: ${path}`);
+    } catch (e) {
+      Alert.alert('Erro', 'Não foi possível exportar o relatório.');
+    }
   };
 
   const getTeamName = (teamId: string) => {

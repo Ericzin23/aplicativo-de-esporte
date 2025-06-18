@@ -9,24 +9,14 @@ import {
   Alert,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { useAppData } from '../../contexts/AppDataContext';
+import { useAppData, Event } from '../../contexts/AppDataContext';
 import { AddEventModal } from '../../components/AddEventModal';
 
-interface Event {
-  id: string;
-  title: string;
-  type: 'jogo' | 'treino' | 'reuniao';
-  sport: string;
-  date: string;
-  time: string;
-  description: string;
-  location?: string;
-  createdAt: string;
-}
 
 export default function Calendario() {
   const [selectedDate, setSelectedDate] = useState(new Date().toISOString().split('T')[0]);
   const [showEventModal, setShowEventModal] = useState(false);
+  const [editingEvent, setEditingEvent] = useState<Event | null>(null);
   const [selectedSport, setSelectedSport] = useState('Todos');
   const [selectedEventType, setSelectedEventType] = useState('Todos');
   const { events, getEventsBySport } = useAppData();
@@ -110,6 +100,7 @@ export default function Calendario() {
   };
 
   const handleAddEvent = () => {
+    setEditingEvent(null);
     setShowEventModal(true);
   };
 
@@ -120,7 +111,10 @@ export default function Calendario() {
       `Esporte: ${sportLabel}\nTipo: ${getEventTypeLabel(event.type)}\nData: ${new Date(event.date).toLocaleDateString('pt-BR')}\nHorário: ${event.time}\nLocal: ${event.location || 'Não informado'}\n\n${event.description || ''}`,
       [
         { text: 'Fechar', style: 'cancel' },
-        { text: 'Editar', onPress: () => Alert.alert('Editar', 'Funcionalidade em desenvolvimento') }
+        { text: 'Editar', onPress: () => {
+            setEditingEvent(event);
+            setShowEventModal(true);
+          } }
       ]
     );
   };
@@ -510,10 +504,14 @@ export default function Calendario() {
         )}
       </ScrollView>
 
-      <AddEventModal 
-        visible={showEventModal} 
-        onClose={() => setShowEventModal(false)}
+      <AddEventModal
+        visible={showEventModal}
+        onClose={() => {
+          setShowEventModal(false);
+          setEditingEvent(null);
+        }}
         selectedDate={selectedDate}
+        event={editingEvent || undefined}
       />
     </SafeAreaView>
   );
