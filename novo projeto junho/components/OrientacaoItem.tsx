@@ -9,11 +9,6 @@ export interface Orientacao {
   descricao: string;
   data: string;
   lida: boolean;
-  professorId?: string;
-  professorName?: string;
-  jogadorId?: string;
-  jogadorName?: string;
-  esporte?: string;
 }
 
 interface OrientacaoItemProps {
@@ -30,46 +25,20 @@ function getIconName(tipo: string) {
       return 'nutrition';
     case 'recuperacao':
       return 'fitness';
-    case 'feedback':
-      return 'chatbubble-ellipses';
     default:
       return 'chatbubble';
   }
 }
 
-function getIconColor(tipo: string) {
-  switch (tipo) {
-    case 'treino':
-      return '#4CAF50';
-    case 'alimentacao':
-      return '#FF9800';
-    case 'recuperacao':
-      return '#2196F3';
-    case 'feedback':
-      return '#9C27B0';
-    default:
-      return '#4CAF50';
-  }
-}
-
 export default function OrientacaoItem({ orientacao, highlight, onMarkAsRead }: OrientacaoItemProps) {
   const icon = getIconName(orientacao.tipo);
-  const iconColor = getIconColor(orientacao.tipo);
   return (
     <View style={[styles.container, highlight && styles.highlight]}>
       <View style={styles.row}>
-        <Ionicons name={icon as any} size={24} color={iconColor} style={styles.icon} />
+        <Ionicons name={icon as any} size={24} color="#4CAF50" style={styles.icon} />
         <View style={{ flex: 1 }}>
           <Text style={styles.titulo}>{orientacao.titulo}</Text>
-          <View style={styles.metaInfo}>
-            <Text style={styles.data}>{new Date(orientacao.data).toLocaleDateString('pt-BR')}</Text>
-            {orientacao.tipo === 'feedback' && orientacao.professorName && (
-              <Text style={styles.professor}>• {orientacao.professorName}</Text>
-            )}
-            {orientacao.esporte && (
-              <Text style={styles.esporte}>• {orientacao.esporte}</Text>
-            )}
-          </View>
+          <Text style={styles.data}>{new Date(orientacao.data).toLocaleDateString('pt-BR')}</Text>
         </View>
         {!orientacao.lida && onMarkAsRead && (
           <TouchableOpacity onPress={() => onMarkAsRead(orientacao.id)} style={styles.markButton}>
@@ -109,26 +78,9 @@ const styles = StyleSheet.create({
     fontWeight: 'bold',
     color: '#333',
   },
-  metaInfo: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    flexWrap: 'wrap',
-    marginTop: 2,
-  },
   data: {
     fontSize: 12,
     color: '#666',
-  },
-  professor: {
-    fontSize: 12,
-    color: '#9C27B0',
-    fontWeight: '500',
-    marginLeft: 4,
-  },
-  esporte: {
-    fontSize: 12,
-    color: '#666',
-    marginLeft: 4,
   },
   descricao: {
     fontSize: 14,

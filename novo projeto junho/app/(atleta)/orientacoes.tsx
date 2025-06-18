@@ -67,15 +67,6 @@ export default function OrientacoesAtleta() {
           <Text style={styles.subtitle}>
             {user?.sport ? `Orientações para ${user.sport}` : 'Orientações'}
           </Text>
-          {orientacoes.filter(o => !o.lida).length > 0 && (
-            <View style={styles.badgeContainer}>
-              <View style={styles.badge}>
-                <Text style={styles.badgeText}>
-                  {orientacoes.filter(o => !o.lida).length} nova(s)
-                </Text>
-              </View>
-            </View>
-          )}
         </View>
 
         {loading ? (
@@ -145,20 +136,5 @@ const styles = StyleSheet.create({
     color: '#757575',
     textAlign: 'center',
     marginTop: 16,
-  },
-  badgeContainer: {
-    marginTop: 8,
-  },
-  badge: {
-    backgroundColor: '#9C27B0',
-    paddingHorizontal: 12,
-    paddingVertical: 4,
-    borderRadius: 12,
-    alignSelf: 'flex-start',
-  },
-  badgeText: {
-    color: '#fff',
-    fontSize: 12,
-    fontWeight: '600',
   },
 }); 

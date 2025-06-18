@@ -14,7 +14,6 @@ interface Team {
   losses: number;
   draws: number;
   createdAt: string;
-  professorId?: string;
 }
 
 interface Player {
@@ -360,7 +359,6 @@ export function AppDataProvider({ children }: { children: ReactNode }) {
   const addTeam = async (team: Omit<Team, 'id' | 'createdAt'>) => {
     try {
       console.log('🏆 Tentando adicionar time:', team);
-      console.log('🏆 Estado atual dos times:', teams.length);
       
       // Verifica se já existe um time com o mesmo nome
       const teamExists = teams.some(t => t.name.toLowerCase() === team.name.toLowerCase());
@@ -378,48 +376,14 @@ export function AppDataProvider({ children }: { children: ReactNode }) {
 
       // Atualiza o estado local primeiro
       const updatedTeams = [...teams, newTeam];
-      console.log('🏆 Times atualizados (local):', updatedTeams.length);
       setTeams(updatedTeams);
 
-      // Salva no AsyncStorage com múltiplas tentativas
-      let saveSuccess = false;
-      for (let attempt = 1; attempt <= 3; attempt++) {
-        try {
-          await AsyncStorage.setItem('@GestaoTimes:teams', JSON.stringify(updatedTeams));
-          
-          // Verifica se foi salvo corretamente
-          const savedData = await AsyncStorage.getItem('@GestaoTimes:teams');
-          const savedTeams = savedData ? JSON.parse(savedData) : [];
-          
-          if (savedTeams.length === updatedTeams.length) {
-            saveSuccess = true;
-            console.log(`✅ Time salvo com sucesso na tentativa ${attempt}:`, {
-              id: newTeam.id,
-              name: newTeam.name,
-              sport: newTeam.sport,
-              professorId: newTeam.professorId,
-              totalTimes: savedTeams.length
-            });
-            break;
-          } else {
-            console.log(`⚠️ Tentativa ${attempt} falhou - dados não persistiram corretamente`);
-          }
-        } catch (error) {
-          console.error(`❌ Erro na tentativa ${attempt}:`, error);
-        }
-        
-        // Aguardar antes da próxima tentativa
-        if (attempt < 3) {
-          await new Promise(resolve => setTimeout(resolve, 200));
-        }
-      }
+      // Salva no AsyncStorage
+      await AsyncStorage.setItem('@GestaoTimes:teams', JSON.stringify(updatedTeams));
       
-      if (!saveSuccess) {
-        console.error('❌ Falha ao salvar time após 3 tentativas');
-        // Reverte o estado em caso de erro
-        setTeams(teams);
-        throw new Error('Falha ao salvar o time. Tente novamente.');
-      }
+      // Verifica se foi salvo corretamente
+      const savedData = await AsyncStorage.getItem('@GestaoTimes:teams');
+      console.log('✅ Time salvo no AsyncStorage:', savedData ? JSON.parse(savedData).length : 0, 'times');
 
     } catch (error) {
       console.error('❌ Erro ao criar time:', error);

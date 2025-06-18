@@ -13,7 +13,6 @@ import {
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useAppData } from '../contexts/AppDataContext';
-import { useAuth } from '../contexts/AuthContext';
 
 interface AddTeamModalProps {
   visible: boolean;
@@ -25,7 +24,6 @@ export function AddTeamModal({ visible, onClose }: AddTeamModalProps) {
   const [selectedSport, setSelectedSport] = useState('');
   const [loading, setLoading] = useState(false);
   const { addTeam } = useAppData();
-  const { user } = useAuth();
 
   // Esportes disponíveis
   const sports = [
@@ -60,12 +58,6 @@ export function AddTeamModal({ visible, onClose }: AddTeamModalProps) {
 
     try {
       setLoading(true);
-      console.log('🏆 Criando time com dados:', {
-        name: name.trim(),
-        sport: selectedSport,
-        professorId: user?.id
-      });
-      
       await addTeam({
         name: name.trim(),
         sport: selectedSport,
@@ -73,17 +65,14 @@ export function AddTeamModal({ visible, onClose }: AddTeamModalProps) {
         wins: 0,
         losses: 0,
         draws: 0,
-        professorId: user?.id || '',
       });
-      
-      console.log('✅ Time criado com sucesso!');
       
       // Limpa o formulário e fecha o modal
       setName('');
       setSelectedSport('');
       onClose();
     } catch (error) {
-      console.error('❌ Erro ao criar time:', error);
+      console.error('Erro ao criar time:', error);
       Alert.alert(
         'Erro ao criar time',
         error instanceof Error ? error.message : 'Não foi possível criar o time. Por favor, tente novamente.',
