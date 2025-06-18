@@ -1,5 +1,4 @@
 import React, { createContext, useContext, useState, useEffect, ReactNode, useCallback } from 'react';
-import { getItem, setItem, StorageKeys } from '../utils/storage';
 import { useNotifications } from './NotificationContext';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import 'react-native-get-random-values';
@@ -85,8 +84,6 @@ interface AppDataContextType {
     todayGames: number;
     todayTrainings: number;
   };
-  syncProfessorToAluno: (data: Partial<AppDataContextType>) => void;
-  syncAlunoToProfessor: (data: Partial<AppDataContextType>) => void;
 }
 
 const AppDataContext = createContext<AppDataContextType | undefined>(undefined);
@@ -315,6 +312,49 @@ export function AppDataProvider({ children }: { children: ReactNode }) {
     }
   }, [events, notifyEvent, showNotification]);
 
+  const addGuidance = useCallback(
+    async (playerId: string, guidance: Omit<Guidance, 'id'>) => {
+      try {
+        const newGuidance: Guidance = { ...guidance, id: uuid() };
+        const key = `@GestaoTimes:orientacoes_${playerId}`;
+        const stored = await AsyncStorage.getItem(key);
+        const list: Guidance[] = stored ? JSON.parse(stored) : [];
+        const updated = [...list, newGuidance];
+        await AsyncStorage.setItem(key, JSON.stringify(updated));
+        notifyGuidance(newGuidance.titulo, newGuidance.descricao);
+        showNotification('Orientação enviada com sucesso!');
+      } catch (error) {
+        console.error('Erro ao salvar orientação:', error);
+        showNotification('Erro ao salvar orientação', 'error');
+      }
+    },
+    [notifyGuidance, showNotification]
+  );
+
+  const addPlayerStats = useCallback(
+    async (playerId: string, stats: Record<string, number>) => {
+      try {
+        const index = players.findIndex(p => p.id === playerId);
+        if (index === -1) throw new Error('Jogador não encontrado');
+        const updatedPlayer = {
+          ...players[index],
+          stats: { ...players[index].stats, ...stats },
+          updatedAt: new Date().toISOString(),
+        };
+        const updated = [...players];
+        updated[index] = updatedPlayer;
+        setPlayers(updated);
+        await AsyncStorage.setItem('@GestaoTimes:players', JSON.stringify(updated));
+        notifyStats('Estatísticas atualizadas', updatedPlayer.name);
+        showNotification('Estatísticas atualizadas com sucesso!');
+      } catch (error) {
+        console.error('Erro ao atualizar estatísticas:', error);
+        showNotification('Erro ao atualizar estatísticas', 'error');
+      }
+    },
+    [players, notifyStats, showNotification]
+  );
+
   // Funções de atualização
   const updateTeam = useCallback(async (id: string, team: Partial<Team>) => {
     try {
@@ -415,6 +455,8 @@ export function AppDataProvider({ children }: { children: ReactNode }) {
     addTeam,
     addPlayer,
     addEvent,
+    addGuidance,
+    addPlayerStats,
     updateTeam,
     updatePlayer,
     deleteTeam,

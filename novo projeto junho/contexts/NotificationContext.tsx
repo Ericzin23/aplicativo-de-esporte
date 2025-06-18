@@ -2,6 +2,7 @@ import React, { createContext, useState, useContext, useEffect, ReactNode } from
 import * as Notifications from 'expo-notifications';
 import * as Device from 'expo-device';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { Alert } from 'react-native';
 
 interface NotificationContextType {
   badges: {
@@ -12,6 +13,7 @@ interface NotificationContextType {
   notifyEvent: (title: string, body: string) => Promise<void>;
   notifyStats: (title: string, body: string) => Promise<void>;
   notifyGuidance: (title: string, body: string) => Promise<void>;
+  showNotification: (message: string, type?: 'success' | 'error' | 'info') => void;
   clearBadge: (type: 'events' | 'stats' | 'guidance') => void;
 }
 
@@ -59,6 +61,14 @@ export function NotificationProvider({ children }: { children: ReactNode }) {
     await saveBadges({ ...badges, guidance: true });
   };
 
+  const showNotification = (
+    message: string,
+    type: 'success' | 'error' | 'info' = 'success'
+  ) => {
+    const title = type === 'error' ? 'Erro' : 'Sucesso';
+    Alert.alert(title, message);
+  };
+
   const clearBadge = (type: 'events' | 'stats' | 'guidance') => {
     const updated = { ...badges, [type]: false };
     saveBadges(updated);
@@ -80,7 +90,9 @@ export function NotificationProvider({ children }: { children: ReactNode }) {
   };
 
   return (
-    <NotificationContext.Provider value={{ badges, notifyEvent, notifyStats, notifyGuidance, clearBadge }}>
+    <NotificationContext.Provider
+      value={{ badges, notifyEvent, notifyStats, notifyGuidance, showNotification, clearBadge }}
+    >
       {children}
     </NotificationContext.Provider>
   );
