@@ -34,6 +34,7 @@ export default function AtletaHome() {
   const [atletaStats, setAtletaStats] = useState<AtletaStats>({
     posicao: 'Aguardando definição do professor',
     time: 'Aguardando definição do professor',
+    esporte: user?.sport || 'futebol',
     jogos: 0,
     gols: 0,
     assistencias: 0,
@@ -99,6 +100,7 @@ export default function AtletaHome() {
         setAtletaStats({
           posicao: posicao,
           time: timeInfo,
+          esporte: user?.sport || atletaPlayer.sport,
           jogos: sportStats.jogos || 0,
           gols: sportStats.gols || 0,
           assistencias: sportStats.assistencias || 0,

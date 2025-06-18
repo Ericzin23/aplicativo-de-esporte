@@ -25,17 +25,6 @@ interface Team {
   createdAt: string;
 }
 
-interface Player {
-  id: string;
-  name: string;
-  sport: string;
-  position: string;
-  teamId: string;
-  goals: number;
-  assists: number;
-  age: number;
-  createdAt: string;
-}
 
 export default function Times() {
   const [searchText, setSearchText] = useState('');
@@ -212,10 +201,10 @@ export default function Times() {
                         </View>
                       </View>
                       <View style={styles.playerStats}>
-                        <Text style={styles.playerStatText}>
-                          {player.goals}G {player.assists}A
-                        </Text>
-                        <Text style={styles.playerAge}>{player.age} anos</Text>
+                          <Text style={styles.playerStatText}>
+                            {player.stats?.goals ?? 0}G {player.stats?.assists ?? 0}A
+                          </Text>
+                          <Text style={styles.playerAge}>{player.profile.age} anos</Text>
                       </View>
                     </View>
                   ))

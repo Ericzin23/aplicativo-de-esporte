@@ -65,7 +65,10 @@ export function NotificationProvider({ children }: { children: ReactNode }) {
     message: string,
     type: 'success' | 'error' | 'info' = 'success'
   ) => {
-    const title = type === 'error' ? 'Erro' : 'Sucesso';
+    let title = 'Sucesso';
+    if (type === 'error') title = 'Erro';
+    else if (type === 'info') title = 'Informação';
+
     Alert.alert(title, message);
   };
 
@@ -91,7 +94,14 @@ export function NotificationProvider({ children }: { children: ReactNode }) {
 
   return (
     <NotificationContext.Provider
-      value={{ badges, notifyEvent, notifyStats, notifyGuidance, showNotification, clearBadge }}
+      value={{
+        badges,
+        notifyEvent,
+        notifyStats,
+        notifyGuidance,
+        showNotification,
+        clearBadge,
+      }}
     >
       {children}
     </NotificationContext.Provider>
