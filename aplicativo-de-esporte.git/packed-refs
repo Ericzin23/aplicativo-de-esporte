@@ -1,0 +1,26 @@
+# pack-refs with: peeled fully-peeled sorted 
+74dc7adcc510633398a9fd6780dee89d196da554 refs/heads/codex/corrigir-e-completar-aba-de-estatísticas
+840582a4dfde5fe97b9478f0a77e21c464f5d0c7 refs/heads/codex/criar-função-para-backup-de-dados
+1428b4ffd27b7c9d7fe9c68044c5a20fafe9a3d3 refs/heads/codex/garantir-exibição-de-eventos-na-agenda-do-aluno
+f1550656d39786dec2ddf42e42a2f50b529ff061 refs/heads/codex/implementar-dark-mode-no-app
+4495011d6e87b42989e47d94acf4773252f331c9 refs/heads/codex/implementar-dashboard-do-professor
+5d0ce1e5e25103cce9b72b35be1453dc605b805f refs/heads/codex/implementar-exibição-de-orientações
+2b742e929be341e80865a8343330a9e85e839d25 refs/heads/codex/implementar-funcionalidades-e-melhorias-propostas
+d01e6084e9b05cfce760ca765aeeda2f588b81ed refs/heads/codex/implementar-melhorias-no-app-esportivo
+ecc469f336853d861cc5c805a0e97eea82a792c6 refs/heads/codex/implementar-sistema-de-notificações
+947277d2cc4eb320673adc737c3027b65e9861d1 refs/heads/codex/revisar-código-e-corrigir-erros
+b1c05694c20a87748ebe2d5fc3d5381e9402657c refs/heads/codex/revisar-formulário-de-edição-de-perfil
+a401b6cd5ee7ba21e5d6da366fd0c4a4c2c603dc refs/heads/codex/revisar-lógica-e-conexões-do-código
+c65abfede69f71e5a6cbfb0970df665c5fa512a2 refs/heads/main
+a401b6cd5ee7ba21e5d6da366fd0c4a4c2c603dc refs/pull/1/head
+840582a4dfde5fe97b9478f0a77e21c464f5d0c7 refs/pull/10/head
+f1550656d39786dec2ddf42e42a2f50b529ff061 refs/pull/11/head
+947277d2cc4eb320673adc737c3027b65e9861d1 refs/pull/12/head
+2b742e929be341e80865a8343330a9e85e839d25 refs/pull/2/head
+d01e6084e9b05cfce760ca765aeeda2f588b81ed refs/pull/3/head
+5d0ce1e5e25103cce9b72b35be1453dc605b805f refs/pull/4/head
+74dc7adcc510633398a9fd6780dee89d196da554 refs/pull/5/head
+1428b4ffd27b7c9d7fe9c68044c5a20fafe9a3d3 refs/pull/6/head
+ecc469f336853d861cc5c805a0e97eea82a792c6 refs/pull/7/head
+b1c05694c20a87748ebe2d5fc3d5381e9402657c refs/pull/8/head
+4495011d6e87b42989e47d94acf4773252f331c9 refs/pull/9/head
