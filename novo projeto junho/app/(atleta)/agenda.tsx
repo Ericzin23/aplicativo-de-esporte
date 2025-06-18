@@ -1,214 +1,131 @@
-import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
-import AsyncStorage from '@react-native-async-storage/async-storage';
+import React, { useEffect, useState } from 'react';
+import { SafeAreaView, ScrollView, View, Text, StyleSheet } from 'react-native';
+import { Ionicons } from '@expo/vector-icons';
+import { useAuth } from '../../contexts/AuthContext';
+import { useAppData } from '../../contexts/AppDataContext';
 
-interface User {
+interface Event {
   id: string;
-  name: string;
-  email: string;
-  password: string;
-  avatar?: string;
-  userType: 'professor' | 'atleta';
-  professorId?: string;
-  sport?: string;
-  position?: string;
+  title: string;
+  type: 'jogo' | 'treino' | 'reuniao';
+  sport: string;
+  date: string;
+  time: string;
+  description: string;
+  location?: string;
 }
 
-interface AuthContextData {
-  user: User | null;
-  isLoading: boolean;
-  signIn: (email: string, password: string) => Promise<void>;
-  signUp: (
-    name: string,
-    email: string,
-    password: string,
-    userType: 'professor' | 'atleta',
-    professorId?: string,
-    sport?: string,
-    position?: string
-  ) => Promise<void>;
-  signOut: () => Promise<void>;
-  updateProfile: (userData: Partial<User>) => Promise<void>;
-  updatePassword: (current: string, newPassword: string) => Promise<void>;
-}
-
-const AuthContext = createContext<AuthContextData>({} as AuthContextData);
-
-interface AuthProviderProps {
-  children: ReactNode;
-}
-
-export function AuthProvider({ children }: AuthProviderProps) {
-  const [user, setUser] = useState<User | null>(null);
-  const [isLoading, setIsLoading] = useState(true);
+export default function Agenda() {
+  const { user } = useAuth();
+  const { getEventsBySport } = useAppData();
+  const [events, setEvents] = useState<Event[]>([]);
 
   useEffect(() => {
-    loadStoredUser();
-  }, []);
-
-  async function loadStoredUser() {
-    try {
-      const storedUser = await AsyncStorage.getItem('@GestaoTimes:user');
-      if (storedUser) {
-        setUser(JSON.parse(storedUser));
-      }
-    } catch (error) {
-      console.log('Erro ao carregar usuário:', error);
-    } finally {
-      setIsLoading(false);
+    if (user?.sport) {
+      const upcoming = getEventsBySport(user.sport)
+        .filter(e => new Date(e.date) >= new Date())
+        .sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
+      setEvents(upcoming);
     }
-  }
+  }, [user, getEventsBySport]);
 
-  async function signIn(email: string, password: string) {
-    try {
-      setIsLoading(true);
-      const storedUsers = await AsyncStorage.getItem('@GestaoTimes:users');
-      const users = storedUsers ? JSON.parse(storedUsers) : [];
-
-      const foundUser = users.find((u: User) => u.email === email);
-
-      if (foundUser && foundUser.password === password) {
-        await AsyncStorage.setItem('@GestaoTimes:user', JSON.stringify(foundUser));
-        setUser(foundUser);
-      } else if (email === 'admin@teste.com' && password === '123456') {
-        const userData: User = {
-          id: '1',
-          name: 'Eric',
-          email: email,
-          password: '123456',
-          avatar: 'https://via.placeholder.com/150',
-          userType: 'professor'
-        };
-
-        await AsyncStorage.setItem('@GestaoTimes:user', JSON.stringify(userData));
-        setUser(userData);
-      } else {
-        throw new Error('Email ou senha incorretos');
-      }
-    } catch (error) {
-      console.error('Erro no login:', error);
-      throw error;
-    } finally {
-      setIsLoading(false);
-    }
-  }
-
-  async function signUp(
-    name: string,
-    email: string,
-    password: string,
-    userType: 'professor' | 'atleta',
-    professorId?: string,
-    sport?: string,
-    position?: string
-  ) {
-    try {
-      setIsLoading(true);
-      const users = await AsyncStorage.getItem('@GestaoTimes:users');
-      const parsedUsers = users ? JSON.parse(users) : [];
-
-      const userExists = parsedUsers.find((user: User) => user.email === email);
-
-      if (userExists) {
-        throw new Error('Este e-mail já está em uso!');
-      }
-
-      const newUser: User = {
-        id: Date.now().toString(),
-        name,
-        email,
-        password,
-        userType,
-        ...(userType === 'atleta' && professorId && { professorId }),
-        ...(userType === 'atleta' && sport && { sport }),
-        ...(userType === 'atleta' && position && { position }),
-      };
-
-      await AsyncStorage.setItem(
-        '@GestaoTimes:users',
-        JSON.stringify([...parsedUsers, newUser])
-      );
-
-      await AsyncStorage.setItem('@GestaoTimes:user', JSON.stringify(newUser));
-      setUser(newUser);
-    } catch (error) {
-      console.error('Erro no cadastro:', error);
-      throw error; // Isso permite que o componente capture e exiba o erro
-    } finally {
-      setIsLoading(false);
-    }
-  }
-
-  async function signOut() {
-    try {
-      await AsyncStorage.removeItem('@GestaoTimes:user');
-      setUser(null);
-    } catch (error) {
-      console.log('Erro ao fazer logout:', error);
-    }
-  }
-
-  async function updateProfile(userData: Partial<User>) {
-    try {
-      if (user) {
-        const updatedUser = { ...user, ...userData };
-        await AsyncStorage.setItem('@GestaoTimes:user', JSON.stringify(updatedUser));
-
-        const storedUsers = await AsyncStorage.getItem('@GestaoTimes:users');
-        const users = storedUsers ? JSON.parse(storedUsers) : [];
-        const userIndex = users.findIndex((u: User) => u.id === user.id);
-
-        if (userIndex !== -1) {
-          users[userIndex] = updatedUser;
-          await AsyncStorage.setItem('@GestaoTimes:users', JSON.stringify(users));
-        }
-
-        setUser(updatedUser);
-      }
-    } catch (error) {
-      console.error('Erro ao atualizar perfil:', error);
-    }
-  }
-
-  async function updatePassword(current: string, newPassword: string) {
-    if (!user) return;
-
-    const storedUsers = await AsyncStorage.getItem('@GestaoTimes:users');
-    const users = storedUsers ? JSON.parse(storedUsers) : [];
-    const userIndex = users.findIndex((u: User) => u.id === user.id);
-
-    if (userIndex === -1 || users[userIndex].password !== current) {
-      throw new Error('Senha atual incorreta');
-    }
-
-    users[userIndex].password = newPassword;
-    await AsyncStorage.setItem('@GestaoTimes:users', JSON.stringify(users));
-
-    const updated = { ...user, password: newPassword };
-    await AsyncStorage.setItem('@GestaoTimes:user', JSON.stringify(updated));
-    setUser(updated);
+  if (!user) {
+    return null;
   }
 
   return (
-    <AuthContext.Provider
-      value={{
-        user,
-        isLoading,
-        signIn,
-        signUp,
-        signOut,
-        updateProfile,
-        updatePassword,
-      }}
-    >
-      {children}
-    </AuthContext.Provider>
+    <SafeAreaView style={styles.container}>
+      <ScrollView contentContainerStyle={styles.content}>
+        {events.length === 0 ? (
+          <View style={styles.empty}>
+            <Ionicons name="calendar" size={48} color="#ccc" />
+            <Text style={styles.emptyText}>Nenhum evento agendado</Text>
+          </View>
+        ) : (
+          events.map(event => (
+            <View key={event.id} style={styles.card}>
+              <View style={styles.header}>
+                <Ionicons
+                  style={styles.icon}
+                  size={20}
+                  color="#4CAF50"
+                  name={
+                    event.type === 'jogo'
+                      ? 'football'
+                      : event.type === 'treino'
+                      ? 'fitness'
+                      : 'people'
+                  }
+                />
+                <Text style={styles.title}>{event.title}</Text>
+              </View>
+              <Text style={styles.date}>
+                {new Date(event.date).toLocaleDateString('pt-BR')} - {event.time}
+              </Text>
+              {event.location ? (
+                <Text style={styles.location}>📍 {event.location}</Text>
+              ) : null}
+              {event.description ? (
+                <Text style={styles.description}>{event.description}</Text>
+              ) : null}
+            </View>
+          ))
+        )}
+      </ScrollView>
+    </SafeAreaView>
   );
 }
 
-export function useAuth() {
-  const context = useContext(AuthContext);
-  if (!context) {
-    throw new Error('useAuth deve ser usado dentro de um AuthProvider');
-  }
-  return context;
-}
+const styles = StyleSheet.create({
+  container: {
+    flex: 1,
+    backgroundColor: '#f5f5f5',
+  },
+  content: {
+    padding: 16,
+  },
+  empty: {
+    alignItems: 'center',
+    marginTop: 40,
+  },
+  emptyText: {
+    marginTop: 8,
+    color: '#666',
+    fontSize: 16,
+  },
+  card: {
+    backgroundColor: '#fff',
+    borderRadius: 12,
+    padding: 16,
+    marginBottom: 12,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 3,
+  },
+  header: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 4,
+  },
+  icon: {
+    marginRight: 8,
+  },
+  title: {
+    fontSize: 16,
+    fontWeight: 'bold',
+    color: '#333',
+  },
+  date: {
+    color: '#666',
+    marginBottom: 4,
+  },
+  location: {
+    color: '#666',
+    marginBottom: 4,
+  },
+  description: {
+    color: '#444',
+  },
+});
