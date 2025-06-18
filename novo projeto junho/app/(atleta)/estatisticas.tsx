@@ -268,18 +268,20 @@ export default function EstatisticasAtleta() {
         {/* Gráficos de Estatísticas */}
         <View style={styles.chartSection}>
           <Text style={styles.sectionTitle}>Resumo {periodos.find(p => p.value === periodoSelecionado)?.label}</Text>
-          <BarChart
-            data={{
-              labels: ['Gols', 'Assist.', 'Bloq.'],
-              datasets: [{ data: [periodTotals.gols, periodTotals.assistencias, periodTotals.bloqueios] }]
-            }}
-            width={screenWidth}
-            height={220}
-            fromZero
-            showValuesOnTopOfBars
-            chartConfig={{
-              backgroundColor: '#fff',
-              backgroundGradientFrom: '#fff',
+            <BarChart
+              data={{
+                labels: ['Gols', 'Assist.', 'Bloq.'],
+                datasets: [{ data: [periodTotals.gols, periodTotals.assistencias, periodTotals.bloqueios] }]
+              }}
+              width={screenWidth}
+              height={220}
+              yAxisLabel=""
+              yAxisSuffix=""
+              fromZero
+              showValuesOnTopOfBars
+              chartConfig={{
+                backgroundColor: '#fff',
+                backgroundGradientFrom: '#fff',
               backgroundGradientTo: '#fff',
               decimalPlaces: 0,
               color: (opacity = 1) => `rgba(76, 175, 80, ${opacity})`,
@@ -289,23 +291,24 @@ export default function EstatisticasAtleta() {
             style={{ borderRadius: 16 }}
           />
 
-          {Object.keys(periodTotals.desempenhoPorPosicao).length > 0 && (
-            <PieChart
-              data={Object.entries(periodTotals.desempenhoPorPosicao).map(([pos, count], index) => ({
-                name: pos,
-                population: count,
-                color: chartColors[index % chartColors.length],
-                legendFontColor: '#333',
-                legendFontSize: 12,
-              }))}
-              width={screenWidth}
-              height={220}
-              accessor="population"
-              paddingLeft="15"
-              chartConfig={{ color: () => '#000' }}
-              style={{ marginTop: 20 }}
-            />
-          )}
+            {Object.keys(periodTotals.desempenhoPorPosicao).length > 0 && (
+              <PieChart
+                data={Object.entries(periodTotals.desempenhoPorPosicao).map(([pos, count], index) => ({
+                  name: pos,
+                  population: count,
+                  color: chartColors[index % chartColors.length],
+                  legendFontColor: '#333',
+                  legendFontSize: 12,
+                }))}
+                width={screenWidth}
+                height={220}
+                backgroundColor="transparent"
+                accessor="population"
+                paddingLeft="15"
+                chartConfig={{ color: () => '#000' }}
+                style={{ marginTop: 20 }}
+              />
+            )}
         </View>
 
         {/* Últimos Jogos Detalhados */}

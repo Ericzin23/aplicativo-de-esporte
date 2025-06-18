@@ -32,8 +32,8 @@ interface Player {
   };
   profile: {
     age: number;
-    height?: number;
-    weight?: number;
+    height?: string;
+    weight?: string;
     photo?: string;
   };
 }
@@ -127,8 +127,8 @@ export function AddPlayerModal({ visible, onClose, editingPlayer }: AddPlayerMod
         },
         profile: {
           age: Number(age),
-          height: editingPlayer?.profile?.height,
-          weight: editingPlayer?.profile?.weight,
+          height: editingPlayer?.profile?.height?.toString(),
+          weight: editingPlayer?.profile?.weight?.toString(),
           photo: editingPlayer?.profile?.photo
         }
       };
