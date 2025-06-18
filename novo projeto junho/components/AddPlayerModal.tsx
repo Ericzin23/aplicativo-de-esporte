@@ -19,9 +19,6 @@ interface Player {
   sport: string;
   position: string;
   teamId: string;
-  goals: number;
-  assists: number;
-  age: number;
   createdAt: string;
   updatedAt: string;
   stats: {
@@ -78,7 +75,7 @@ export function AddPlayerModal({ visible, onClose, editingPlayer }: AddPlayerMod
       setSport(editingPlayer.sport as keyof typeof sportsPositions);
       setPosition(editingPlayer.position);
       setTeamId(editingPlayer.teamId);
-      setAge(editingPlayer.age.toString());
+      setAge(editingPlayer.profile.age.toString());
     } else {
       resetForm();
     }
