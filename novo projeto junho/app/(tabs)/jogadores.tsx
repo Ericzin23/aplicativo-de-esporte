@@ -107,31 +107,6 @@ export default function JogadoresScreen() {
     }, [])
   );
 
-  // Limpar dados fictícios ao iniciar
-  React.useEffect(() => {
-    const limparDadosFicticios = async () => {
-      try {
-        // Limpar jogadores
-        await AsyncStorage.setItem('@GestaoTimes:players', JSON.stringify([]));
-        
-        // Limpar feedbacks
-        await AsyncStorage.setItem('feedbacks', JSON.stringify({}));
-        
-        // Limpar times
-        await AsyncStorage.setItem('@GestaoTimes:teams', JSON.stringify([]));
-        
-        // Limpar eventos
-        await AsyncStorage.setItem('@GestaoTimes:events', JSON.stringify([]));
-        
-        console.log('✅ Dados fictícios removidos com sucesso');
-      } catch (error) {
-        console.error('❌ Erro ao limpar dados fictícios:', error);
-      }
-    };
-
-    limparDadosFicticios();
-  }, []);
-
   // Carregar feedbacks do storage
   React.useEffect(() => {
     const loadFeedbacks = async () => {
