@@ -202,20 +202,22 @@ export default function RelatoriosScreen() {
           <Card style={styles.card}>
             <Card.Title title="Jogadores por Time" />
             <Card.Content>
-              <BarChart
-                data={{
-                  labels: (relatorioData?.jogadoresPorTime || []).map((t: any) => t.name),
-                  datasets: [{
-                    data: (relatorioData?.jogadoresPorTime || []).map((t: any) => t.count)
-                  }]
-                }}
-                width={Dimensions.get('window').width - 40}
-                height={220}
-                chartConfig={{
-                  backgroundColor: '#ffffff',
-                  backgroundGradientFrom: '#ffffff',
-                  backgroundGradientTo: '#ffffff',
-                  color: (opacity = 1) => `rgba(0, 102, 255, ${opacity})`,
+                <BarChart
+                  data={{
+                    labels: (relatorioData?.jogadoresPorTime || []).map((t: any) => t.name),
+                    datasets: [{
+                      data: (relatorioData?.jogadoresPorTime || []).map((t: any) => t.count)
+                    }]
+                  }}
+                  width={Dimensions.get('window').width - 40}
+                  height={220}
+                  yAxisLabel=""
+                  yAxisSuffix=""
+                  chartConfig={{
+                    backgroundColor: '#ffffff',
+                    backgroundGradientFrom: '#ffffff',
+                    backgroundGradientTo: '#ffffff',
+                    color: (opacity = 1) => `rgba(0, 102, 255, ${opacity})`,
                 }}
                 style={styles.chart}
               />

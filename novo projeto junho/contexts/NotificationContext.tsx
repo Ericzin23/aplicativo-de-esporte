@@ -12,6 +12,7 @@ interface NotificationContextType {
   notifyEvent: (title: string, body: string) => Promise<void>;
   notifyStats: (title: string, body: string) => Promise<void>;
   notifyGuidance: (title: string, body: string) => Promise<void>;
+  showNotification: (message: string, type?: 'success' | 'error') => void;
   clearBadge: (type: 'events' | 'stats' | 'guidance') => void;
 }
 
@@ -59,6 +60,11 @@ export function NotificationProvider({ children }: { children: ReactNode }) {
     await saveBadges({ ...badges, guidance: true });
   };
 
+  const showNotification = (message: string, type: 'success' | 'error' = 'success') => {
+    // Simple feedback via console for now
+    console.log(type === 'error' ? `Erro: ${message}` : message);
+  };
+
   const clearBadge = (type: 'events' | 'stats' | 'guidance') => {
     const updated = { ...badges, [type]: false };
     saveBadges(updated);
@@ -80,7 +86,7 @@ export function NotificationProvider({ children }: { children: ReactNode }) {
   };
 
   return (
-    <NotificationContext.Provider value={{ badges, notifyEvent, notifyStats, notifyGuidance, clearBadge }}>
+    <NotificationContext.Provider value={{ badges, notifyEvent, notifyStats, notifyGuidance, showNotification, clearBadge }}>
       {children}
     </NotificationContext.Provider>
   );

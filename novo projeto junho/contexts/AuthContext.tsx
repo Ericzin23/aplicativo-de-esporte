@@ -168,8 +168,6 @@ export function AuthProvider({ children }: AuthProviderProps) {
       }
 
       setUser(updatedUser);
-
-      return updatedUser;
     } catch (error) {
       console.error('Erro ao atualizar perfil:', error);
       throw error;

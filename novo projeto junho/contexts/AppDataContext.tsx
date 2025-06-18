@@ -63,6 +63,7 @@ interface AppDataContextType {
   teams: Team[];
   players: Player[];
   events: Event[];
+  isLoading: boolean;
   addTeam: (team: Omit<Team, 'id' | 'createdAt'>) => Promise<void>;
   addPlayer: (player: Omit<Player, 'id'>) => Promise<void>;
   addEvent: (event: Omit<Event, 'id' | 'createdAt'>) => Promise<void>;
@@ -307,13 +308,36 @@ export function AppDataProvider({ children }: { children: ReactNode }) {
       const updatedEvents = [...events, newEvent];
       setEvents(updatedEvents);
       await AsyncStorage.setItem('@GestaoTimes:events', JSON.stringify(updatedEvents));
-      notifyEvent(newEvent);
+      notifyEvent(newEvent.title, newEvent.description);
       showNotification('Evento adicionado com sucesso!');
     } catch (error) {
       console.error('Erro ao adicionar evento:', error);
       showNotification('Erro ao adicionar evento', 'error');
     }
   }, [events, notifyEvent, showNotification]);
+
+  const addGuidance = useCallback(async (playerId: string, guidance: Omit<Guidance, 'id'>) => {
+    try {
+      const stored = await AsyncStorage.getItem(`@GestaoTimes:orientacoes_${playerId}`);
+      const list: Guidance[] = stored ? JSON.parse(stored) : [];
+      const newItem: Guidance = { ...guidance, id: uuid() };
+      const updated = [...list, newItem];
+      await AsyncStorage.setItem(`@GestaoTimes:orientacoes_${playerId}`, JSON.stringify(updated));
+      showNotification('Orientação adicionada!');
+    } catch (error) {
+      console.error('Erro ao adicionar orientação:', error);
+      showNotification('Erro ao adicionar orientação', 'error');
+    }
+  }, [showNotification]);
+
+  const addPlayerStats = useCallback(async (playerId: string, stats: Record<string, number>) => {
+    try {
+      const key = `@GestaoTimes:player_stats_${playerId}`;
+      await AsyncStorage.setItem(key, JSON.stringify(stats));
+    } catch (error) {
+      console.error('Erro ao salvar estatísticas:', error);
+    }
+  }, []);
 
   // Funções de atualização
   const updateTeam = useCallback(async (id: string, team: Partial<Team>) => {
@@ -408,10 +432,23 @@ export function AppDataProvider({ children }: { children: ReactNode }) {
     };
   }, [teams, players, events]);
 
+  const syncProfessorToAluno = useCallback((data: Partial<AppDataContextType>) => {
+    if (data.teams) setTeams(data.teams);
+    if (data.players) setPlayers(data.players);
+    if (data.events) setEvents(data.events);
+  }, []);
+
+  const syncAlunoToProfessor = useCallback((data: Partial<AppDataContextType>) => {
+    if (data.teams) setTeams(data.teams);
+    if (data.players) setPlayers(data.players);
+    if (data.events) setEvents(data.events);
+  }, []);
+
   const value = {
     teams,
     players,
     events,
+    isLoading,
     addTeam,
     addPlayer,
     addEvent,
@@ -426,7 +463,11 @@ export function AppDataProvider({ children }: { children: ReactNode }) {
     getEventsBySport,
     getTodayEvents,
     getUpcomingEvents,
-    getStats
+    getStats,
+    addGuidance,
+    addPlayerStats,
+    syncProfessorToAluno,
+    syncAlunoToProfessor
   };
 
   if (isLoading) {
