@@ -12,12 +12,13 @@ import {
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import DateTimePicker from '@react-native-community/datetimepicker';
-import { useAppData } from '../contexts/AppDataContext';
+import { useAppData, Event } from '../contexts/AppDataContext';
 
 interface AddEventModalProps {
   visible: boolean;
   onClose: () => void;
   selectedDate?: string;
+  event?: Event;
 }
 
 const eventTypes = [
@@ -34,21 +35,39 @@ const sports = [
   { label: 'Handebol', value: 'handebol' },
 ];
 
-export function AddEventModal({ visible, onClose, selectedDate }: AddEventModalProps) {
-  const [title, setTitle] = useState('');
-  const [type, setType] = useState<'jogo' | 'treino' | 'reuniao'>('jogo');
-  const [sport, setSport] = useState('futebol');
-  const [date, setDate] = useState(selectedDate ? new Date(selectedDate) : new Date());
-  const [time, setTime] = useState(new Date());
-  const [description, setDescription] = useState('');
-  const [location, setLocation] = useState('');
+export function AddEventModal({ visible, onClose, selectedDate, event }: AddEventModalProps) {
+  const [title, setTitle] = useState(event?.title || '');
+  const [type, setType] = useState<'jogo' | 'treino' | 'reuniao'>(event?.type || 'jogo');
+  const [sport, setSport] = useState(event?.sport || 'futebol');
+  const [date, setDate] = useState(
+    event ? new Date(event.date) : selectedDate ? new Date(selectedDate) : new Date()
+  );
+  const [time, setTime] = useState(
+    event ? new Date(`${event.date}T${event.time}`) : new Date()
+  );
+  const [description, setDescription] = useState(event?.description || '');
+  const [location, setLocation] = useState(event?.location || '');
   const [showDatePicker, setShowDatePicker] = useState(false);
   const [showTimePicker, setShowTimePicker] = useState(false);
   const [loading, setLoading] = useState(false);
-  const { addEvent } = useAppData();
+  const { addEvent, updateEvent } = useAppData();
 
   const locationInputRef = useRef<TextInput>(null);
   const descriptionInputRef = useRef<TextInput>(null);
+
+  React.useEffect(() => {
+    if (event) {
+      setTitle(event.title);
+      setType(event.type);
+      setSport(event.sport);
+      setDate(new Date(event.date));
+      setTime(new Date(`${event.date}T${event.time}`));
+      setDescription(event.description);
+      setLocation(event.location || '');
+    } else {
+      resetForm();
+    }
+  }, [event]);
 
   const handleSubmit = async () => {
     console.log('🚀 Tentando adicionar evento:', { title, type, sport, date, time, description, location });
@@ -64,17 +83,29 @@ export function AddEventModal({ visible, onClose, selectedDate }: AddEventModalP
       const eventDate = date.toISOString().split('T')[0];
       const eventTime = time.toTimeString().slice(0, 5);
 
-      await addEvent({
-        title: title.trim(),
-        type,
-        sport,
-        date: eventDate,
-        time: eventTime,
-        description: description.trim(),
-        location: location.trim(),
-      });
-      
-      Alert.alert('Sucesso!', 'Evento criado com sucesso!');
+      if (event) {
+        await updateEvent(event.id, {
+          title: title.trim(),
+          type,
+          sport,
+          date: eventDate,
+          time: eventTime,
+          description: description.trim(),
+          location: location.trim(),
+        });
+        Alert.alert('Sucesso!', 'Evento atualizado com sucesso!');
+      } else {
+        await addEvent({
+          title: title.trim(),
+          type,
+          sport,
+          date: eventDate,
+          time: eventTime,
+          description: description.trim(),
+          location: location.trim(),
+        });
+        Alert.alert('Sucesso!', 'Evento criado com sucesso!');
+      }
       resetForm();
       onClose();
     } catch (error) {
@@ -139,7 +170,7 @@ export function AddEventModal({ visible, onClose, selectedDate }: AddEventModalP
       <View style={styles.overlay}>
         <View style={styles.modal}>
           <View style={styles.header}>
-            <Text style={styles.title}>Novo Evento</Text>
+            <Text style={styles.title}>{event ? 'Editar Evento' : 'Novo Evento'}</Text>
             <TouchableOpacity onPress={handleClose} style={styles.closeButton}>
               <Ionicons name="close" size={24} color="#666" />
             </TouchableOpacity>
@@ -293,7 +324,13 @@ export function AddEventModal({ visible, onClose, selectedDate }: AddEventModalP
                 styles.submitButtonText,
                 loading && styles.submitButtonTextDisabled
               ]}>
-                {loading ? 'Criando Evento...' : 'Criar Evento'}
+                {loading
+                  ? event
+                    ? 'Salvando...'
+                    : 'Criando Evento...'
+                  : event
+                  ? 'Salvar Evento'
+                  : 'Criar Evento'}
               </Text>
             </TouchableOpacity>
           </View>

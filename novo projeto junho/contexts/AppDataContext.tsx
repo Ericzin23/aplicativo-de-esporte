@@ -39,7 +39,7 @@ interface Player {
   };
 }
 
-interface Event {
+export interface Event {
   id: string;
   title: string;
   type: 'jogo' | 'treino' | 'reuniao';
@@ -66,6 +66,7 @@ interface AppDataContextType {
   addTeam: (team: Omit<Team, 'id' | 'createdAt'>) => Promise<void>;
   addPlayer: (player: Omit<Player, 'id'>) => Promise<void>;
   addEvent: (event: Omit<Event, 'id' | 'createdAt'>) => Promise<void>;
+  updateEvent: (id: string, event: Partial<Event>) => Promise<void>;
   addGuidance: (playerId: string, guidance: Omit<Guidance, 'id'>) => Promise<void>;
   addPlayerStats: (playerId: string, stats: Record<string, number>) => Promise<void>;
   updateTeam: (id: string, team: Partial<Team>) => void;
@@ -340,6 +341,18 @@ export function AppDataProvider({ children }: { children: ReactNode }) {
     }
   }, [players, showNotification]);
 
+  const updateEvent = useCallback(async (id: string, event: Partial<Event>) => {
+    try {
+      const updatedEvents = events.map(e => e.id === id ? { ...e, ...event } : e);
+      setEvents(updatedEvents);
+      await AsyncStorage.setItem('@GestaoTimes:events', JSON.stringify(updatedEvents));
+      showNotification('Evento atualizado com sucesso!');
+    } catch (error) {
+      console.error('Erro ao atualizar evento:', error);
+      showNotification('Erro ao atualizar evento', 'error');
+    }
+  }, [events, showNotification]);
+
   // Funções de remoção
   const deleteTeam = useCallback(async (id: string) => {
     try {
@@ -415,6 +428,7 @@ export function AppDataProvider({ children }: { children: ReactNode }) {
     addTeam,
     addPlayer,
     addEvent,
+    updateEvent,
     updateTeam,
     updatePlayer,
     deleteTeam,
